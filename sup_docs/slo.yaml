@@ -1,0 +1,36 @@
+# SVPMS Service Level Objectives
+service_name: svpms-api
+owner_team: platform
+
+# Availability SLO
+availability_slo:
+  target: 99.9  # Explicit numeric: 99.9%
+  error_budget: 0.1  # Explicit numeric: 0.1%
+  measurement_window: 30d
+  burn_rate_alerts:
+    critical: 10  # Numeric: 10x
+    warning: 5    # Numeric: 5x
+
+# Latency SLOs
+latency_slos:
+  - name: api_p95_latency
+    target_ms: 500  # Explicit numeric: 500ms
+    percentile: 95  # Explicit numeric: 95th
+    thresholds:
+      critical: 1000  # Explicit numeric: 1000ms
+      warning: 750    # Explicit numeric: 750ms
+  
+  - name: api_p99_latency
+    target_ms: 1000  # Explicit numeric: 1000ms
+    percentile: 99   # Explicit numeric: 99th
+    thresholds:
+      critical: 2000
+      warning: 1500
+
+# Error Rate SLOs
+error_rate_slos:
+  - name: api_5xx_error_rate
+    target_percent: 1.0  # Explicit numeric: 1%
+    thresholds:
+      critical: 2.0  # Explicit numeric: 2%
+      warning: 1.5   # Explicit numeric: 1.5%

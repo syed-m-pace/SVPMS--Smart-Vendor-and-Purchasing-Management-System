@@ -1,0 +1,144 @@
+{
+  "info": {
+    "name": "SVPMS E2E API & SSO Tests",
+    "description": "End-to-end tests for SVPMS API, ERP connectors, and SAML SSO",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "pr_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"admin@test.com\",\"password\":\"test123\"}"
+            },
+            "url": "{{base_url}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Purchase Request Workflow",
+      "item": [
+        {
+          "name": "Create PR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"PR created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.collectionVariables.set('pr_id', pm.response.json().id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"department_id\":\"dept-123\",\"line_items\":[{\"description\":\"Laptop\",\"quantity\":1,\"unit_price_cents\":150000}]}"
+            },
+            "url": "{{base_url}}/api/v1/purchase-requests"
+          }
+        },
+        {
+          "name": "Submit PR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/purchase-requests/{{pr_id}}/submit"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERP Integration Tests",
+      "item": [
+        {
+          "name": "Sync PO to NetSuite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"PO synced to NetSuite\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json()).to.have.property('netsuite_id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/integrations/netsuite/sync-po/{{po_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML SSO Tests",
+      "item": [
+        {
+          "name": "Initiate SAML Login",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/saml/login?tenant=acme-corp"
+          }
+        }
+      ]
+    }
+  ]
+}

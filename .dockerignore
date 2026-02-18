@@ -1,0 +1,13 @@
+.venv/
+.git/
+.next/
+node_modules/
+__pycache__/
+*.pyc
+.env.local
+mobile/
+web/
+tests/
+*.md
+.DS_Store
+.gemini/

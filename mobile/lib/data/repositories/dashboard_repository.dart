@@ -1,0 +1,58 @@
+import 'package:dio/dio.dart';
+import '../datasources/api/api_client.dart';
+import '../models/dashboard_stats.dart';
+import '../models/purchase_order.dart';
+import '../../services/local_cache_service.dart';
+
+class DashboardRepository {
+  final ApiClient _api;
+  final LocalCacheService _cache;
+
+  DashboardRepository({
+    required ApiClient api,
+    required LocalCacheService cache,
+  }) : _api = api,
+       _cache = cache;
+
+  Future<DashboardStats> getStats() async {
+    try {
+      final data = await _api.getDashboard();
+      await _cache.cacheDashboard(data);
+      return DashboardStats.fromJson(data);
+    } catch (e) {
+      if (e is DioException) {
+        final cached = _cache.getCachedDashboard();
+        if (cached != null) return DashboardStats.fromJson(cached);
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<PurchaseOrder>> getRecentPOs() async {
+    // For recent POs, we can reuse the generic PO cache or a specific one.
+    // Simplifying: Fetch from API, if fail, try to get from PO list cache (best effort)
+    try {
+      final data = await _api.getPurchaseOrders(page: 1, size: 5);
+      // We don't necessarily cache *just* these 5 separate from the main list,
+      // but we could. For now, let's rely on the main PO list cache if available
+      // or just return empty if offline and not cached.
+      // Actually, dashboard usually loads first. Let's cache these 5 as "recent_pos" if we wanted.
+      // But to be safe, let's just use the main PO cache if available.
+      final items = data['items'] as List<dynamic>? ?? [];
+      return items
+          .map((e) => PurchaseOrder.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      if (e is DioException) {
+        final cached = _cache.getCachedPOs();
+        if (cached != null) {
+          return cached
+              .take(5)
+              .map((e) => PurchaseOrder.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      }
+      return [];
+    }
+  }
+}

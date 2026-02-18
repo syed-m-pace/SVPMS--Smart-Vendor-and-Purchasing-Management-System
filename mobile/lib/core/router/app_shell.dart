@@ -1,0 +1,90 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../presentation/auth/bloc/auth_bloc.dart';
+
+/// Shell widget containing bottom navigation bar and app bar
+class AppShell extends StatelessWidget {
+  final Widget child;
+  const AppShell({super.key, required this.child});
+
+  static const _tabs = [
+    '/dashboard',
+    '/purchase-orders',
+    '/rfqs',
+    '/invoices',
+    '/profile',
+  ];
+
+  int _currentIndex(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    for (int i = 0; i < _tabs.length; i++) {
+      if (location.startsWith(_tabs[i])) return i;
+    }
+    return 0;
+  }
+
+  String _title(int index) {
+    switch (index) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Purchase Orders';
+      case 2:
+        return 'RFQs';
+      case 3:
+        return 'Invoices';
+      case 4:
+        return 'Profile';
+      default:
+        return 'SVPMS';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final index = _currentIndex(context);
+
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is Unauthenticated) {
+          context.go('/login');
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_title(index)),
+          actions: [
+            if (index == 3) // invoices tab
+              IconButton(
+                icon: const Icon(Icons.upload),
+                tooltip: 'Upload Invoice',
+                onPressed: () => context.push('/invoices/upload'),
+              ),
+          ],
+        ),
+        body: child,
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: index,
+          onTap: (i) => context.go(_tabs[i]),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_cart),
+              label: 'Orders',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'RFQs'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long),
+              label: 'Invoices',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
+      ),
+    );
+  }
+}

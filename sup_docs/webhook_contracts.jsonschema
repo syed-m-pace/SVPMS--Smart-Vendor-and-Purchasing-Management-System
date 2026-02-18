@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SVPMS Webhook Event Contracts",
+  "definitions": {
+    "webhook_envelope": {
+      "type": "object",
+      "required": [
+        "id",
+        "event_type",
+        "timestamp",
+        "data",
+        "idempotency_key",
+        "signature"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "purchase_request.approved",
+            "invoice.matched",
+            "payment.completed"
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Format: {entity}:{id}:{event}:{timestamp_ms}",
+          "pattern": "^[a-z_]+:[0-9a-f-]+:[a-z_.]+:[0-9]+$"
+        },
+        "signature": {
+          "type": "string",
+          "description": "HMAC-SHA256 signature",
+          "pattern": "^sha256=[a-f0-9]{64}$"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "retry_semantics": {
+    "max_retries": 5,
+    "retry_schedule": [
+      {
+        "attempt": 1,
+        "delay_seconds": 60
+      },
+      {
+        "attempt": 2,
+        "delay_seconds": 300
+      },
+      {
+        "attempt": 3,
+        "delay_seconds": 900
+      },
+      {
+        "attempt": 4,
+        "delay_seconds": 3600
+      },
+      {
+        "attempt": 5,
+        "delay_seconds": 10800
+      }
+    ],
+    "timeout_seconds": 30,
+    "idempotency_storage_hours": 72
+  },
+  "signature_verification": {
+    "algorithm": "HMAC-SHA256",
+    "header_name": "X-SVPMS-Signature",
+    "format": "sha256={hex_digest}"
+  }
+}

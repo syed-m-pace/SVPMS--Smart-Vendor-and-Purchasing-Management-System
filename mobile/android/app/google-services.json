@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1088002837739",
+    "project_id": "svpms-6d4ac",
+    "storage_bucket": "svpms-6d4ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1088002837739:android:915c22a6a8cf539b6142ae",
+        "android_client_info": {
+          "package_name": "com.svpms.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPrrOKDJPlcorBpcye7fgq-h9kkspEPyk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
