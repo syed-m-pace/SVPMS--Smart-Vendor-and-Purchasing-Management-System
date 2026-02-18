@@ -25,7 +25,6 @@ COPY api/ api/
 COPY keys/ keys/
 COPY scripts/ scripts/
 COPY requirements.txt .
-COPY .env .env
 
 # Port from env (Cloud Run injects $PORT)
 ENV PORT=8000
@@ -33,7 +32,7 @@ EXPOSE $PORT
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health')" || exit 1
 
 # Run with uvicorn
 CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 2 --log-level info"]
