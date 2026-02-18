@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle, Ban } from "lucide-react";
+import { ArrowLeft, CheckCircle, Ban, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -11,11 +11,17 @@ import { formatDate } from "@/lib/utils";
 import type { Vendor } from "@/types/models";
 import { toast } from "sonner";
 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+
 export default function VendorDetailPage() {
     const params = useParams();
     const router = useRouter();
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [loading, setLoading] = useState(true);
+    const [blockOpen, setBlockOpen] = useState(false);
+    const [blockReason, setBlockReason] = useState("");
+    const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
         vendorService.get(params.id as string).then(setVendor).catch(() => toast.error("Failed to load vendor")).finally(() => setLoading(false));
@@ -27,10 +33,17 @@ export default function VendorDetailPage() {
     async function handleApprove() {
         try { await vendorService.approve(vendor!.id); toast.success("Vendor approved"); setVendor({ ...vendor!, status: "ACTIVE" }); } catch { toast.error("Failed"); }
     }
+
     async function handleBlock() {
-        const reason = prompt("Block reason:");
-        if (!reason) return;
-        try { await vendorService.block(vendor!.id, reason); toast.success("Vendor blocked"); setVendor({ ...vendor!, status: "BLOCKED" }); } catch { toast.error("Failed"); }
+        if (!blockReason.trim()) return;
+        setProcessing(true);
+        try {
+            await vendorService.block(vendor!.id, blockReason);
+            toast.success("Vendor blocked");
+            setVendor({ ...vendor!, status: "BLOCKED" });
+            setBlockOpen(false);
+            setBlockReason("");
+        } catch { toast.error("Failed"); } finally { setProcessing(false); }
     }
 
     return (
@@ -46,7 +59,7 @@ export default function VendorDetailPage() {
                     <Button onClick={handleApprove} variant="success" size="sm"><CheckCircle className="mr-2 h-4 w-4" />Approve</Button>
                 )}
                 {vendor.status === "ACTIVE" && (
-                    <Button onClick={handleBlock} variant="destructive" size="sm"><Ban className="mr-2 h-4 w-4" />Block</Button>
+                    <Button onClick={() => setBlockOpen(true)} variant="destructive" size="sm"><Ban className="mr-2 h-4 w-4" />Block</Button>
                 )}
             </div>
 
@@ -62,6 +75,28 @@ export default function VendorDetailPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={blockOpen} onOpenChange={setBlockOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Block Vendor</DialogTitle>
+                        <DialogDescription>Are you sure? This will prevent any new POs for this vendor.</DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                        value={blockReason}
+                        onChange={(e) => setBlockReason(e.target.value)}
+                        placeholder="Reason for blocking..."
+                        rows={3}
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setBlockOpen(false)} disabled={processing}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleBlock} disabled={!blockReason.trim() || processing}>
+                            {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Block Vendor
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

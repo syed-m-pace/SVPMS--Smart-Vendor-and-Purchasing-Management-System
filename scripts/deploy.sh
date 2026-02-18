@@ -14,9 +14,10 @@ set -euo pipefail
 #   - Docker daemon running
 #   - GCP project configured
 # ============================================================
+export PATH=$PATH:/Users/pacewisdom/google-cloud-sdk/bin
 
 # ---- Configuration ----
-PROJECT_ID="${GCP_PROJECT_ID:-325948496969}"
+PROJECT_ID="${GCP_PROJECT_ID:-svpms-cloud}"
 REGION="${GCP_REGION:-asia-south1}"
 SERVICE_NAME="svpms-api"
 IMAGE_NAME="svpms-backend"
@@ -53,22 +54,19 @@ gcloud artifacts repositories describe svpms --location="${REGION}" 2>/dev/null 
         --description="SVPMS Docker images"
 
 # ---- Step 3: Build Docker image ----
-echo "▶ [3/5] Building Docker image..."
-docker build -t "${IMAGE_TAG}" -t "${IMAGE_LATEST}" .
-echo "   ✅ Image built: ${IMAGE_TAG}"
+# ---- Step 3: Build and Push with Cloud Build ----
+echo "▶ [3/5] Building and Pushing with Cloud Build..."
+gcloud builds submit --tag "${IMAGE_TAG}" --project "${PROJECT_ID}" .
+echo "   ✅ Image built and pushed: ${IMAGE_TAG}"
 
 if [ "${DRY_RUN}" = true ]; then
     echo ""
-    echo "🏁 Dry run complete. Image built but not pushed/deployed."
+    echo "🏁 Dry run complete."
     exit 0
 fi
 
-# ---- Step 4: Push to Artifact Registry ----
-echo "▶ [4/5] Pushing to Artifact Registry..."
-gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-docker push "${IMAGE_TAG}"
-docker push "${IMAGE_LATEST}"
-echo "   ✅ Image pushed"
+# Skip Step 4 as it's handled by Cloud Build
+echo "▶ [4/5] Image already pushed by Cloud Build."
 
 # ---- Step 5: Deploy to Cloud Run ----
 echo "▶ [5/5] Deploying to Cloud Run..."
@@ -76,7 +74,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --image="${IMAGE_TAG}" \
     --region="${REGION}" \
     --platform=managed \
-    --port=8000 \
+    --port=8080 \
     --memory=512Mi \
     --cpu=1 \
     --min-instances=0 \

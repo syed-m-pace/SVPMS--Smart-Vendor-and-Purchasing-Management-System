@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ const lineItemSchema = z.object({
 });
 
 const prSchema = z.object({
-    department_id: z.string().uuid("Select department"),
+    department_id: z.string().min(1, "Select department"),
     title: z.string().min(3, "Title required").max(200),
     description: z.string().max(1000).optional(),
     line_items: z.array(lineItemSchema).min(1, "At least one item"),
@@ -41,16 +41,23 @@ export default function NewPurchaseRequestPage() {
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<PRForm>({
         resolver: zodResolver(prSchema),
         defaultValues: {
+            department_id: "",
             line_items: [{ line_number: 1, description: "", quantity: 1, unit_price_cents: 0 }],
         },
     });
+
+    console.log("Current Dept:", watch("department_id"));
+    console.log("Errors:", errors);
 
     const { fields, append, remove } = useFieldArray({ control, name: "line_items" });
     const lineItems = watch("line_items");
     const total = lineItems.reduce((sum, li) => sum + (li.quantity || 0) * (li.unit_price_cents || 0), 0);
 
     useEffect(() => {
-        departmentService.list().then((r) => setDepartments(r.data)).catch(() => { });
+        departmentService.list().then((r) => {
+            console.log("Departments loaded:", r.data);
+            setDepartments(r.data);
+        }).catch((err) => console.error("Failed to load departments", err));
     }, []);
 
     async function onSubmit(data: PRForm) {
@@ -80,11 +87,25 @@ export default function NewPurchaseRequestPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium mb-2">Department *</label>
-                                <select {...register("department_id")} defaultValue="" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none">
-                                    <option value="" disabled>Select department</option>
-                                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
+                                <Controller
+                                    name="department_id"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <select
+                                            {...field}
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
+                                        >
+                                            <option value="">Select department</option>
+                                            {departments.map((d) => (
+                                                <option key={d.id} value={d.id}>
+                                                    {d.name} ({d.code})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                />
                                 {errors.department_id && <p className="text-sm text-destructive mt-1">{errors.department_id.message}</p>}
+                                <p className="text-xs text-muted-foreground mt-1">Found {departments.length} departments</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-2">Title *</label>

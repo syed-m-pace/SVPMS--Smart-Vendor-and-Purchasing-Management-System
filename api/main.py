@@ -18,6 +18,11 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("starting_svpms", env=settings.ENVIRONMENT)
+    import os
+    try:
+        logger.info("checking_keys_dir", files=os.listdir("keys"), cwd=os.getcwd())
+    except Exception as e:
+        logger.error("keys_dir_check_failed", error=str(e))
     await init_db()
     init_firebase()
     yield

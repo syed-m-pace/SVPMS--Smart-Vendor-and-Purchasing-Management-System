@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 const vendorSchema = z.object({
     legal_name: z.string().min(2, "Min 2 characters").max(200),
-    tax_id: z.string().regex(/^[A-Z0-9]{10,15}$/, "10-15 uppercase alphanumeric characters"),
+    tax_id: z.string().regex(/^[a-zA-Z0-9]{10,15}$/, "10-15 alphanumeric characters").transform(v => v.toUpperCase()),
     email: z.string().email("Valid email required"),
     phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Valid phone number").optional().or(z.literal("")),
     bank_name: z.string().max(200).optional().or(z.literal("")),
@@ -44,7 +44,9 @@ export default function NewVendorPage() {
             toast.success(`Vendor "${vendor.legal_name}" created`);
             router.push(`/vendors/${vendor.id}`);
         } catch (e: any) {
-            toast.error(e.response?.data?.detail || "Failed to create vendor");
+            const detail = e.response?.data?.detail;
+            const msg = typeof detail === "string" ? detail : JSON.stringify(detail) || "Failed to create vendor";
+            toast.error(msg);
         } finally {
             setSubmitting(false);
         }

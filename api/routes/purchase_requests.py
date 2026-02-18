@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -93,29 +93,89 @@ async def list_purchase_requests(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
+    logger.info("pr_list_request", page=page, status=pr_status, dept=department_id, req=requester_id)
+
     q = select(PurchaseRequest).where(PurchaseRequest.deleted_at == None)  # noqa: E711
     count_q = select(func.count(PurchaseRequest.id)).where(PurchaseRequest.deleted_at == None)  # noqa: E711
 
     if pr_status:
+        # DBG: Print status filter
+        print(f"DEBUG: Filtering by status: '{pr_status}' (Type: {type(pr_status)})")
         q = q.where(PurchaseRequest.status == pr_status)
         count_q = count_q.where(PurchaseRequest.status == pr_status)
+    else:
+        print("DEBUG: No status filter applied")
+    
+    # ... (rest of filtering) ...
+
     if department_id:
         q = q.where(PurchaseRequest.department_id == department_id)
         count_q = count_q.where(PurchaseRequest.department_id == department_id)
+    
+    # ---------------------------------------------------------
+    # VISIBILITY LOGIC
+    # ---------------------------------------------------------
+    
+    # Roles that can see ALL PRs (across departments)
+    privileged_roles = ["admin", "finance_head", "cfo", "procurement", "viewer"]
+    
+    user_role = current_user["role"]
+    user_dept = current_user.get("department_id")
+
+    if user_role in privileged_roles:
+        pass  # No extra filter needed (except Drafts below)
+
+    elif user_role == "manager" and user_dept:
+        # Managers see their department + their own
+        q = q.where(
+            or_(
+                PurchaseRequest.department_id == user_dept,
+                PurchaseRequest.requester_id == current_user["user_id"]
+            )
+        )
+        count_q = count_q.where(
+            or_(
+                PurchaseRequest.department_id == user_dept,
+                PurchaseRequest.requester_id == current_user["user_id"]
+            )
+        )
+
+    else:
+        # Everyone else (Employee, Vendor, etc.) -> OWN ONLY
+        q = q.where(PurchaseRequest.requester_id == current_user["user_id"])
+        count_q = count_q.where(PurchaseRequest.requester_id == current_user["user_id"])
+
+    # ---------------------------------------------------------
+    # DRAFT PRIVACY
+    # ---------------------------------------------------------
+    # Drafts are private to the requester, regardless of role
+    # (unless you are the requester)
+    # ---------------------------------------------------------
+    q = q.where(
+        or_(
+            PurchaseRequest.status != "DRAFT",
+            PurchaseRequest.requester_id == current_user["user_id"]
+        )
+    )
+    count_q = count_q.where(
+        or_(
+            PurchaseRequest.status != "DRAFT",
+            PurchaseRequest.requester_id == current_user["user_id"]
+        )
+    )
+
     if requester_id:
         q = q.where(PurchaseRequest.requester_id == requester_id)
         count_q = count_q.where(PurchaseRequest.requester_id == requester_id)
 
-    # Manager: restrict to own department
-    if current_user["role"] == "manager" and current_user.get("department_id"):
-        q = q.where(PurchaseRequest.department_id == current_user["department_id"])
-        count_q = count_q.where(PurchaseRequest.department_id == current_user["department_id"])
+    # Manager: restrict to own department (REMOVED - handled above)
 
     total = (await db.execute(count_q)).scalar() or 0
     result = await db.execute(
         q.order_by(PurchaseRequest.created_at.desc()).offset((page - 1) * limit).limit(limit)
     )
     prs = result.scalars().all()
+    logger.info("pr_list_result", count=len(prs), total=total)
 
     items = []
     for pr in prs:
@@ -257,6 +317,7 @@ async def submit_purchase_request(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
+    logger.info("pr_submit_request", pr_id=pr_id, user=current_user["user_id"])
     result = await db.execute(
         select(PurchaseRequest).where(
             PurchaseRequest.id == pr_id, PurchaseRequest.deleted_at == None  # noqa: E711

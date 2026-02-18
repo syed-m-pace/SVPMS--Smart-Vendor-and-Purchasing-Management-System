@@ -9,11 +9,17 @@ import { approvalService } from "@/lib/api/services";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 import type { Approval } from "@/types/models";
 import { toast } from "sonner";
+import { useUIStore } from "@/lib/stores/ui";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function ApprovalsPage() {
     const [approvals, setApprovals] = useState<Approval[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionId, setActionId] = useState<string | null>(null);
+    const [rejectId, setRejectId] = useState<string | null>(null);
+    const [rejectReason, setRejectReason] = useState("");
+    const triggerRefresh = useUIStore((s) => s.triggerRefreshNotifications);
 
     useEffect(() => { load(); }, []);
 
@@ -31,17 +37,20 @@ export default function ApprovalsPage() {
             await approvalService.approve(id, "Approved via web");
             toast.success("Approved");
             setApprovals(prev => prev.filter(a => a.id !== id));
+            triggerRefresh();
         } catch (e: any) { toast.error(e.response?.data?.detail?.error?.message || "Failed"); } finally { setActionId(null); }
     }
 
-    async function handleReject(id: string) {
-        const comments = prompt("Rejection reason:");
-        if (!comments) return;
-        setActionId(id);
+    async function confirmReject() {
+        if (!rejectId || !rejectReason.trim()) return;
+        setActionId(rejectId);
         try {
-            await approvalService.reject(id, comments);
+            await approvalService.reject(rejectId, rejectReason);
             toast.success("Rejected");
-            setApprovals(prev => prev.filter(a => a.id !== id));
+            setApprovals(prev => prev.filter(a => a.id !== rejectId));
+            triggerRefresh();
+            setRejectId(null);
+            setRejectReason("");
         } catch (e: any) { toast.error(e.response?.data?.detail?.error?.message || "Failed"); } finally { setActionId(null); }
     }
 
@@ -87,11 +96,11 @@ export default function ApprovalsPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2 shrink-0">
-                                    <Button size="sm" variant="success" onClick={() => handleApprove(a.id)} disabled={actionId === a.id}>
+                                    <Button size="sm" variant="success" onClick={() => handleApprove(a.id)} disabled={!!actionId}>
                                         {actionId === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
                                         Approve
                                     </Button>
-                                    <Button size="sm" variant="destructive" onClick={() => handleReject(a.id)} disabled={actionId === a.id}>
+                                    <Button size="sm" variant="destructive" onClick={() => { setRejectId(a.id); setRejectReason(""); }} disabled={!!actionId}>
                                         <XCircle className="h-4 w-4 mr-1" />Reject
                                     </Button>
                                 </div>
@@ -100,6 +109,28 @@ export default function ApprovalsPage() {
                     ))}
                 </div>
             )}
+
+            <Dialog open={!!rejectId} onOpenChange={(open) => !open && setRejectId(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Reject Request</DialogTitle>
+                        <DialogDescription>Please provide a reason for rejection.</DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="Reason for rejection..."
+                        rows={3}
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRejectId(null)} disabled={!!actionId}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmReject} disabled={!rejectReason.trim() || !!actionId}>
+                            {actionId === rejectId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Reject Request
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

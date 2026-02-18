@@ -50,8 +50,8 @@ export default function VendorsPage() {
         {
             header: "Risk Score",
             cell: (v: Vendor) => (
-                <span className={v.risk_score > 50 ? "text-destructive font-bold" : ""}>
-                    {v.risk_score}
+                <span className={v.risk_score && v.risk_score > 50 ? "text-destructive font-bold" : ""}>
+                    {v.risk_score ?? "-"}
                 </span>
             ),
         },

@@ -9,9 +9,10 @@ set -euo pipefail
 #   ./scripts/deploy_web.sh
 #
 # ============================================================
+export PATH=$PATH:/Users/pacewisdom/google-cloud-sdk/bin
 
 # ---- Configuration ----
-PROJECT_ID="${GCP_PROJECT_ID:-325948496969}"
+PROJECT_ID="${GCP_PROJECT_ID:-svpms-cloud}"
 REGION="${GCP_REGION:-asia-south1}"
 SERVICE_NAME="svpms-web"
 IMAGE_NAME="svpms-frontend"
@@ -42,19 +43,15 @@ gcloud artifacts repositories describe svpms --location="${REGION}" 2>/dev/null 
         --description="SVPMS Docker images"
 
 # ---- Step 3: Build Docker image ----
-echo "▶ [3/5] Building Docker image (this may take a while)..."
-# Build from the web directory
+# ---- Step 3: Build and Push with Cloud Build ----
+echo "▶ [3/5] Building and Pushing with Cloud Build..."
 cd web
-docker build -t "${IMAGE_TAG}" -t "${IMAGE_LATEST}" .
+gcloud builds submit --tag "${IMAGE_TAG}" --project "${PROJECT_ID}" .
 cd ..
-echo "   ✅ Image built: ${IMAGE_TAG}"
+echo "   ✅ Image built and pushed: ${IMAGE_TAG}"
 
-# ---- Step 4: Push to Artifact Registry ----
-echo "▶ [4/5] Pushing to Artifact Registry..."
-gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-docker push "${IMAGE_TAG}"
-docker push "${IMAGE_LATEST}"
-echo "   ✅ Image pushed"
+# Skip Step 4 as it's handled by Cloud Build
+echo "▶ [4/5] Image already pushed by Cloud Build."
 
 # ---- Step 5: Deploy to Cloud Run ----
 echo "▶ [5/5] Deploying to Cloud Run..."

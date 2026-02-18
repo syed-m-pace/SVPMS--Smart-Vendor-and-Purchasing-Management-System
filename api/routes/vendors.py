@@ -88,7 +88,7 @@ async def get_vendor(
 async def create_vendor(
     body: VendorCreate,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
+    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     # Check duplicate tax_id

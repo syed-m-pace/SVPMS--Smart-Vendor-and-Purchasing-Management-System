@@ -16,6 +16,7 @@ export const authApi = axios.create({
 
 /* ── Attach token on every request ── */
 api.interceptors.request.use((config) => {
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.params || "");
     if (typeof window !== "undefined") {
         const token = localStorage.getItem("access_token");
         if (token) config.headers.Authorization = `Bearer ${token}`;

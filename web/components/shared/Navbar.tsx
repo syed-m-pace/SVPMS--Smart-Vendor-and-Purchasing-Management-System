@@ -12,11 +12,12 @@ export function Navbar() {
     const user = useAuthStore((s) => s.user);
     const logout = useAuthStore((s) => s.logout);
     const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+    const refreshNotifications = useUIStore((s) => s.refreshNotifications);
     const [pendingCount, setPendingCount] = useState(0);
 
     useEffect(() => {
         approvalService.listPending().then((r) => setPendingCount(r.pagination.total)).catch(() => { });
-    }, []);
+    }, [refreshNotifications]);
 
     return (
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card/80 backdrop-blur-sm px-6">

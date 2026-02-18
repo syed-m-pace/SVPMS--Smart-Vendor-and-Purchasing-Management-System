@@ -29,13 +29,13 @@ export default function DashboardPage() {
         async function load() {
             try {
                 // Fetch dashboard data in parallel
-                const [prRes] = await Promise.all([
+                const [prRes, budgetRes] = await Promise.all([
                     api.get("/purchase-requests", { params: { per_page: 5 } }),
+                    api.get("/budgets", { params: { fiscal_year: 2026, quarter: 1 } }), // Fetch Q1 2026 budgets
                 ]);
 
                 const prData = prRes.data;
                 const prs = prData.data || prData;
-
                 setRecentPRs(Array.isArray(prs) ? prs : []);
 
                 // Calculate stats from available data
@@ -43,11 +43,16 @@ export default function DashboardPage() {
                     ? prs.filter((p: any) => p.status === "PENDING").length
                     : 0;
 
+                const budgets = budgetRes.data.data || [];
+                const totalBudget = budgets.reduce((sum: number, b: any) => sum + b.total_cents, 0);
+                const totalSpent = budgets.reduce((sum: number, b: any) => sum + (b.spent_cents || 0), 0);
+                const utilization = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+
                 setStats({
                     pending_prs: pendingPRs,
                     active_pos: 0,
                     invoice_exceptions: 0,
-                    budget_utilization: 0,
+                    budget_utilization: utilization,
                 });
             } catch (err) {
                 console.error("Dashboard load failed:", err);
