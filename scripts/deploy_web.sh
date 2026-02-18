@@ -69,7 +69,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --max-instances=3 \
     --timeout=300 \
     --allow-unauthenticated \
-    --set-env-vars="NEXT_PUBLIC_API_URL=https://svpms-api-4z654654-el.a.run.app" \
+    --set-env-vars="NEXT_PUBLIC_API_URL=https://svpms-be-gcloud-325948496969.asia-south1.run.app" \
     --quiet
 
 echo ""
