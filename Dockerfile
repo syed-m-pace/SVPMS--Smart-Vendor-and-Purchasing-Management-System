@@ -26,8 +26,8 @@ COPY keys/ keys/
 COPY scripts/ scripts/
 COPY requirements.txt .
 
-# Port from env (Cloud Run injects $PORT)
-ENV PORT=8000
+# Port from env (Cloud Run injects $PORT, default 8080)
+ENV PORT=8080
 EXPOSE $PORT
 
 # Health check
