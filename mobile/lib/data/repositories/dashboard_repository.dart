@@ -32,13 +32,16 @@ class DashboardRepository {
     // For recent POs, we can reuse the generic PO cache or a specific one.
     // Simplifying: Fetch from API, if fail, try to get from PO list cache (best effort)
     try {
-      final data = await _api.getPurchaseOrders(page: 1, size: 5);
+      final data = await _api.getPurchaseOrders(page: 1, limit: 5);
       // We don't necessarily cache *just* these 5 separate from the main list,
       // but we could. For now, let's rely on the main PO list cache if available
       // or just return empty if offline and not cached.
       // Actually, dashboard usually loads first. Let's cache these 5 as "recent_pos" if we wanted.
       // But to be safe, let's just use the main PO cache if available.
-      final items = data['items'] as List<dynamic>? ?? [];
+      final items =
+          data['data'] as List<dynamic>? ??
+          data['items'] as List<dynamic>? ??
+          [];
       return items
           .map((e) => PurchaseOrder.fromJson(e as Map<String, dynamic>))
           .toList();

@@ -86,6 +86,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       try {
         final user = await _repo.getMe();
         emit(Authenticated(user));
+        await _repo.registerCurrentDeviceToken();
       } catch (_) {
         emit(Unauthenticated());
       }
@@ -103,6 +104,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(AuthError('Access denied: Vendor portal only'));
       } else {
         emit(Authenticated(user));
+        await _repo.registerCurrentDeviceToken();
       }
     } catch (e) {
       final msg = e.toString().contains('DioException')

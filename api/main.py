@@ -39,6 +39,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,4 +87,3 @@ app.include_router(devices_router, prefix="/api/v1/users/me/devices", tags=["Dev
 app.include_router(match_router, prefix="/api/v1/match", tags=["Matching"])
 app.include_router(approvals_router, prefix="/api/v1/approvals", tags=["Approvals"])
 app.include_router(jobs_router, prefix="/internal/jobs", tags=["Internal Jobs"])
-

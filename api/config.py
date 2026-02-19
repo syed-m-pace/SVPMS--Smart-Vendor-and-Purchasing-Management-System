@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     CORS_ORIGINS: str = "http://localhost:3000"
+    CORS_ORIGIN_REGEX: Optional[str] = None
 
     @property
     def cors_origins_list(self) -> list[str]:

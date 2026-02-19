@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, or_
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -11,6 +12,7 @@ from api.middleware.authorization import require_roles
 from api.models.vendor import Vendor
 from api.models.purchase_order import PurchaseOrder
 from api.models.audit_log import AuditLog
+from api.models.user import User
 from api.schemas.vendor import (
     VendorCreate,
     VendorUpdate,
@@ -19,9 +21,12 @@ from api.schemas.vendor import (
 )
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
+from api.services.auth_service import hash_password
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+DEFAULT_VENDOR_PASSWORD = "SvpmsTest123!"
 
 
 def _to_response(v: Vendor) -> VendorResponse:
@@ -40,6 +45,24 @@ def _to_response(v: Vendor) -> VendorResponse:
         created_at=v.created_at.isoformat() if v.created_at else "",
         updated_at=v.updated_at.isoformat() if v.updated_at else "",
     )
+
+
+async def _resolve_vendor_for_user(
+    db: AsyncSession, current_user: dict
+) -> Optional[Vendor]:
+    result = await db.execute(
+        select(Vendor)
+        .where(
+            Vendor.tenant_id == current_user["tenant_id"],
+            Vendor.email == current_user["email"],
+            Vendor.deleted_at == None,  # noqa: E711
+        )
+        .order_by(
+            case((Vendor.status == "ACTIVE", 0), else_=1),
+            Vendor.created_at.asc(),
+        )
+    )
+    return result.scalars().first()
 
 
 @router.get("", response_model=PaginatedResponse[VendorResponse])
@@ -61,6 +84,17 @@ async def list_vendors(
         pattern = f"%{search}%"
         q = q.where(or_(Vendor.legal_name.ilike(pattern), Vendor.tax_id.ilike(pattern)))
         count_q = count_q.where(or_(Vendor.legal_name.ilike(pattern), Vendor.tax_id.ilike(pattern)))
+
+    # Vendor users can only see their own vendor record(s).
+    if current_user["role"] == "vendor":
+        q = q.where(
+            Vendor.tenant_id == current_user["tenant_id"],
+            Vendor.email == current_user["email"],
+        )
+        count_q = count_q.where(
+            Vendor.tenant_id == current_user["tenant_id"],
+            Vendor.email == current_user["email"],
+        )
 
     # Admins can see all non-draft vendors, but only their own draft vendors.
     if current_user["role"] == "admin":
@@ -90,6 +124,21 @@ async def list_vendors(
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
 
+@router.get("/me", response_model=VendorResponse)
+async def get_vendor_me(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    if current_user["role"] != "vendor":
+        raise HTTPException(status_code=403, detail="Only vendor users can access this endpoint")
+
+    vendor = await _resolve_vendor_for_user(db, current_user)
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor profile not found")
+
+    return _to_response(vendor)
+
+
 @router.get("/{vendor_id}", response_model=VendorResponse)
 async def get_vendor(
     vendor_id: str,
@@ -102,36 +151,13 @@ async def get_vendor(
     vendor = result.scalar_one_or_none()
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
-    return _to_response(vendor)
 
-    return _to_response(vendor)
+    if current_user["role"] == "vendor" and (
+        str(vendor.tenant_id) != current_user["tenant_id"]
+        or vendor.email != current_user["email"]
+    ):
+        raise HTTPException(status_code=404, detail="Vendor not found")
 
-
-@router.get("/me", response_model=VendorResponse)
-async def get_vendor_me(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db_with_tenant),
-):
-    """Get the vendor profile for the current tenant."""
-    # Assuming one vendor record per tenant for vendor users
-    # Or find by tenant_id?
-    # In this system, it seems Tenant = Vendor for vendor users.
-    # We look for a Vendor record that matches the tenant_id?
-    # Actually, the Vendor table HAS a tenant_id column.
-    # So we select * from vendors where tenant_id = current_user['tenant_id']
-    # But get_db_with_tenant ALREADY filters by tenant_id if we use the session correctly?
-    # No, get_db_with_tenant sets search path or similar.
-    # Let's just query Vendor.
-    # Since we are in the tenant context, we just need to find the vendor record.
-    # If there are multiple, return the first?
-    result = await db.execute(select(Vendor).where(Vendor.deleted_at == None))
-    vendor = result.scalar_one_or_none()
-    
-    if not vendor:
-        # If no vendor record found (maybe admin user of tenant?), handle gracefully?
-        # For a vendor user, this should exist.
-        raise HTTPException(status_code=404, detail="Vendor profile not found")
-        
     return _to_response(vendor)
 
 
@@ -142,15 +168,37 @@ async def create_vendor(
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    # Check duplicate tax_id
-    existing = await db.execute(
+    existing_tax = await db.execute(
         select(Vendor).where(Vendor.tax_id == body.tax_id, Vendor.deleted_at == None)  # noqa: E711
     )
-    if existing.scalar_one_or_none():
+    if existing_tax.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Vendor with this tax_id already exists",
         )
+
+    existing_vendor_email = await db.execute(
+        select(Vendor).where(Vendor.email == body.email, Vendor.deleted_at == None)  # noqa: E711
+    )
+    if existing_vendor_email.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Vendor with this email already exists",
+        )
+
+    existing_user_result = await db.execute(select(User).where(User.email == body.email))
+    existing_user = existing_user_result.scalar_one_or_none()
+    if existing_user:
+        if existing_user.role != "vendor":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already exists for a non-vendor user",
+            )
+        if str(existing_user.tenant_id) != current_user["tenant_id"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already exists for a vendor in another tenant",
+            )
 
     vendor = Vendor(
         tenant_id=current_user["tenant_id"],
@@ -166,6 +214,23 @@ async def create_vendor(
         bank_account_number_encrypted=body.bank_account_number,
     )
     db.add(vendor)
+
+    if existing_user is None:
+        user = User(
+            tenant_id=current_user["tenant_id"],
+            email=body.email,
+            password_hash=hash_password(DEFAULT_VENDOR_PASSWORD),
+            first_name=body.legal_name,
+            last_name="Vendor",
+            role="vendor",
+            is_active=True,
+        )
+        db.add(user)
+    else:
+        existing_user.is_active = True
+        if not existing_user.password_hash:
+            existing_user.password_hash = hash_password(DEFAULT_VENDOR_PASSWORD)
+
     await db.flush()
 
     await create_audit_log(
@@ -219,7 +284,6 @@ async def delete_vendor(
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
 
-    # Check for active POs
     active_po = await db.execute(
         select(func.count(PurchaseOrder.id)).where(
             PurchaseOrder.vendor_id == vendor_id,

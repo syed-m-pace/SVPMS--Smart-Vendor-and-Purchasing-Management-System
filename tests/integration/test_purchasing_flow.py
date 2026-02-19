@@ -77,11 +77,12 @@ async def test_full_purchase_cycle(client, admin_token: str):
     fy = now.year
     q = (now.month - 1) // 3 + 1
     
+    budget_total_cents = 1_000_000_000
     budget_data = {
         "department_id": eng_dept_id,
         "fiscal_year": fy,
         "quarter": q,
-        "total_cents": 10000000, # 10M cents
+        "total_cents": budget_total_cents,
         "currency": "INR"
     }
     # Try to create budget, ignore if 409 (already exists)
@@ -101,7 +102,7 @@ async def test_full_purchase_cycle(client, admin_token: str):
          if existing_budget:
              b_id = existing_budget["id"]
              # Update it
-             update_data = {"total_cents": 10000000}
+             update_data = {"total_cents": budget_total_cents}
              upd_resp = await client.put(f"/api/v1/budgets/{b_id}", json=update_data, headers=auth)
              assert upd_resp.status_code == 200
     elif budget_resp.status_code != 201:
@@ -140,8 +141,14 @@ async def test_full_purchase_cycle(client, admin_token: str):
     approve_resp = await client.post(f"/api/v1/purchase-requests/{pr_id}/approve", headers=mgr_auth, json={"comments": "Looks good"})
     assert approve_resp.status_code == 200
     assert approve_resp.json()["status"] == "APPROVED"
-    
-    # 6. Verify PO Creation (Manual Step by Procurement)
+
+    # 6. Approved PR should appear in PO ready queue
+    ready_resp = await client.get("/api/v1/purchase-orders/ready", headers=proc_auth)
+    assert ready_resp.status_code == 200
+    ready_items = ready_resp.json().get("data", [])
+    assert any(item["pr_id"] == pr_id for item in ready_items)
+
+    # 7. Verify PO Creation (Manual Step by Procurement)
     # The API does not auto-create POs on approval. Procurement must do it.
     po_data = {
         "pr_id": pr_id,
@@ -156,3 +163,10 @@ async def test_full_purchase_cycle(client, admin_token: str):
     # Verify PO details matches PR
     assert po_create_resp.json()["total_cents"] == pr_data["line_items"][0]["quantity"] * pr_data["line_items"][0]["unit_price_cents"]
     assert po_create_resp.json()["status"] == "ISSUED"
+    assert po_create_resp.json()["issued_at"] is not None
+
+    # 8. Once PO is created, PR should no longer be in ready queue
+    ready_after_resp = await client.get("/api/v1/purchase-orders/ready", headers=proc_auth)
+    assert ready_after_resp.status_code == 200
+    ready_after_items = ready_after_resp.json().get("data", [])
+    assert not any(item["pr_id"] == pr_id for item in ready_after_items)

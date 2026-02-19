@@ -32,7 +32,7 @@ void main() async {
   await localCache.init();
 
   // 4. Initialize Notifications (FCM)
-  if (Platform.isAndroid) {
+  if (Platform.isAndroid || Platform.isIOS) {
     await NotificationService().initialize();
   }
 

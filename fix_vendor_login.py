@@ -11,13 +11,12 @@ from sqlalchemy.orm import sessionmaker
 from api.models.user import User
 from api.models.vendor import Vendor
 from api.services.auth_service import hash_password
-import uuid
 
-# Use the production DB URL
-DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_kTG3w6DYoNrZ@ep-winter-flower-abhsz7sw-pooler.eu-west-2.aws.neon.tech/neondb"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise SystemExit("DATABASE_URL is required")
 
-# Tenand ID for Acme (from seed)
-TENANT_ID = uuid.UUID("a0000000-0000-0000-0000-000000000001")
+VENDOR_EMAIL = os.getenv("SVPMS_VENDOR_EMAIL", "")
 COMMON_PASSWORD = "SvpmsTest123!"
 
 async def fix_vendor_user():
@@ -25,20 +24,20 @@ async def fix_vendor_user():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     async with async_session() as session:
-        # 1. Find the vendor
-        # 1. Find the vendor
-        vendor_email = "syedmuheeb2001@gmail.com"
-        result = await session.execute(select(Vendor).where(Vendor.email == vendor_email))
+        if not VENDOR_EMAIL:
+            raise SystemExit("SVPMS_VENDOR_EMAIL is required")
+
+        result = await session.execute(select(Vendor).where(Vendor.email == VENDOR_EMAIL))
         vendor = result.scalar_one_or_none()
         
         if not vendor:
-            print(f"Vendor {vendor_email} not found!")
+            print(f"Vendor {VENDOR_EMAIL} not found!")
             return
 
         print(f"Found Vendor: {vendor.legal_name} ({vendor.id})")
 
         # 2. Check if user already exists
-        u_result = await session.execute(select(User).where(User.email == vendor_email))
+        u_result = await session.execute(select(User).where(User.email == VENDOR_EMAIL))
         user = u_result.scalar_one_or_none()
 
         if user:
@@ -49,9 +48,8 @@ async def fix_vendor_user():
         else:
             print("Creating new User linked to Vendor...")
             new_user = User(
-                id=uuid.uuid4(),
-                tenant_id=TENANT_ID,
-                email=vendor_email,
+                tenant_id=vendor.tenant_id,
+                email=VENDOR_EMAIL,
                 password_hash=hash_password(COMMON_PASSWORD),
                 first_name=vendor.legal_name.split(" ")[0],
                 last_name="Vendor",

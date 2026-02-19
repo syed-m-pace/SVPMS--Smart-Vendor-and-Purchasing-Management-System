@@ -43,6 +43,7 @@ class PurchaseOrder(Base):
     currency: Mapped[str] = mapped_column(String(3), default="INR")
     expected_delivery_date: Mapped[Optional[date]] = mapped_column(Date)
     terms_and_conditions: Mapped[Optional[str]] = mapped_column(Text)
+    issued_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow
     )

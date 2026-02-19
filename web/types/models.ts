@@ -120,6 +120,18 @@ export interface PurchaseOrder {
     vendor?: Vendor;
 }
 
+export interface PurchaseOrderReady {
+    pr_id: string;
+    pr_number: string;
+    requester_id: string;
+    department_id: string;
+    total_cents: number;
+    currency: string;
+    description: string | null;
+    approved_at: string | null;
+    created_at: string;
+}
+
 export type POStatus =
     | "DRAFT"
     | "ISSUED"
@@ -150,23 +162,24 @@ export interface Invoice {
     currency: string;
     match_status: MatchStatus | null;
     ocr_status: string | null;
-    s3_url: string | null;
-    exception_details: unknown[] | null;
+    document_url: string | null;
+    ocr_data: Record<string, unknown> | null;
+    match_exceptions: Record<string, unknown> | null;
     line_items: InvoiceLineItem[];
     created_at: string;
+    updated_at: string;
     vendor?: Vendor;
 }
 
 export type InvoiceStatus =
-    | "DRAFT"
-    | "SUBMITTED"
-    | "UNDER_REVIEW"
-    | "APPROVED"
-    | "PAID"
+    | "UPLOADED"
+    | "MATCHED"
+    | "DISPUTED"
     | "EXCEPTION"
+    | "PAID"
     | "REJECTED";
 
-export type MatchStatus = "MATCHED" | "MISMATCHED" | "PENDING";
+export type MatchStatus = "PASS" | "FAIL" | "OVERRIDE" | "MATCHED" | "MISMATCHED" | "PENDING";
 
 export interface InvoiceLineItem {
     id: string;

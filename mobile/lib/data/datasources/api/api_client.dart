@@ -80,29 +80,32 @@ class ApiClient {
       final results = await Future.wait([
         dio.get(
           '/api/v1/purchase-orders',
-          queryParameters: {'page': 1, 'size': 5},
+          queryParameters: {'page': 1, 'limit': 5},
         ),
-        dio.get('/api/v1/invoices', queryParameters: {'page': 1, 'size': 5}),
-        dio.get('/api/v1/rfqs', queryParameters: {'page': 1, 'size': 5}),
+        dio.get('/api/v1/invoices', queryParameters: {'page': 1, 'limit': 5}),
+        dio.get('/api/v1/rfqs', queryParameters: {'page': 1, 'limit': 5}),
       ]);
 
       final poData = results[0].data;
       final invoiceData = results[1].data;
       final rfqData = results[2].data;
 
+      final poItems = poData['data'] ?? poData['items'] ?? [];
+      final invoiceItems = invoiceData['data'] ?? invoiceData['items'] ?? [];
+      final rfqItems = rfqData['data'] ?? rfqData['items'] ?? [];
+
+      final poTotal = poData['pagination']?['total'] ?? poData['total'] ?? (poItems as List?)?.length ?? 0;
+      final invoiceTotal = invoiceData['pagination']?['total'] ?? invoiceData['total'] ?? (invoiceItems as List?)?.length ?? 0;
+      final rfqTotal = rfqData['pagination']?['total'] ?? rfqData['total'] ?? (rfqItems as List?)?.length ?? 0;
+
       return {
         'stats': {
-          'total_pos':
-              poData['total'] ?? (poData['items'] as List?)?.length ?? 0,
-          'total_invoices':
-              invoiceData['total'] ??
-              (invoiceData['items'] as List?)?.length ??
-              0,
-          'total_rfqs':
-              rfqData['total'] ?? (rfqData['items'] as List?)?.length ?? 0,
+          'total_pos': poTotal,
+          'total_invoices': invoiceTotal,
+          'total_rfqs': rfqTotal,
           'pending_actions': 0,
         },
-        'recent_pos': poData['items'] ?? [],
+        'recent_pos': poItems,
       };
     } catch (e) {
       // Fallback if any endpoint fails
@@ -122,13 +125,13 @@ class ApiClient {
   Future<Map<String, dynamic>> getPurchaseOrders({
     String? status,
     int page = 1,
-    int size = 20,
+    int limit = 20,
   }) async {
     final resp = await dio.get(
       '/api/v1/purchase-orders',
       queryParameters: {
         'page': page,
-        'size': size,
+        'limit': limit,
         if (status != null) 'status': status,
       },
     );
@@ -149,13 +152,13 @@ class ApiClient {
   Future<Map<String, dynamic>> getRFQs({
     String? status,
     int page = 1,
-    int size = 20,
+    int limit = 20,
   }) async {
     final resp = await dio.get(
       '/api/v1/rfqs',
       queryParameters: {
         'page': page,
-        'size': size,
+        'limit': limit,
         if (status != null) 'status': status,
       },
     );
@@ -179,13 +182,13 @@ class ApiClient {
   Future<Map<String, dynamic>> getInvoices({
     String? status,
     int page = 1,
-    int size = 20,
+    int limit = 20,
   }) async {
     final resp = await dio.get(
       '/api/v1/invoices',
       queryParameters: {
         'page': page,
-        'size': size,
+        'limit': limit,
         if (status != null) 'status': status,
       },
     );
@@ -197,14 +200,14 @@ class ApiClient {
     required String invoiceNumber,
     required String invoiceDate, // YYYY-MM-DD
     required int totalCents,
-    String? documentUrl,
+    String? documentKey,
   }) async {
     final data = Map<String, dynamic>.from({
       'po_id': poId,
       'invoice_number': invoiceNumber,
       'invoice_date': invoiceDate,
       'total_cents': totalCents,
-      if (documentUrl != null) 'document_url': documentUrl,
+      if (documentKey != null) 'document_key': documentKey,
     });
     final resp = await dio.post('/api/v1/invoices', data: data);
     return resp.data;
@@ -226,9 +229,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getMe() async {
-    final resp = await dio.get(
-      '/api/v1/users/me',
-    ); // Changed to users/me as per UserResponse schema
+    final resp = await dio.get('/api/v1/users/me');
     return resp.data;
   }
 
@@ -250,7 +251,10 @@ class ApiClient {
   }
 
   // ─── FCM ──────────────────────────────────────────────
-  Future<void> updateFCMToken(String token) async {
-    await dio.post('/api/v1/users/me/devices', data: {'fcm_token': token});
+  Future<void> updateFCMToken(String token, String deviceType) async {
+    await dio.post('/api/v1/users/me/devices', data: {
+      'fcm_token': token,
+      'device_type': deviceType,
+    });
   }
 }

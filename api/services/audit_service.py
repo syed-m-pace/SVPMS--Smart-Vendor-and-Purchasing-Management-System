@@ -2,6 +2,7 @@
 
 from typing import Optional
 from datetime import datetime
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -9,6 +10,20 @@ import structlog
 from api.models.audit_log import AuditLog
 
 logger = structlog.get_logger()
+
+
+def _to_uuid(value: Optional[str], field_name: str, required: bool = False) -> Optional[uuid.UUID]:
+    if value is None:
+        if required:
+            raise ValueError(f"{field_name} is required")
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError):
+        if required:
+            raise ValueError(f"{field_name} must be a valid UUID")
+        logger.warning("audit_invalid_uuid", field=field_name, value=str(value))
+        return None
 
 
 def _compute_changed_fields(
@@ -28,7 +43,7 @@ def _compute_changed_fields(
 async def create_audit_log(
     session: AsyncSession,
     tenant_id: str,
-    actor_id: str,
+    actor_id: Optional[str],
     action: str,
     entity_type: str,
     entity_id: str,
@@ -44,12 +59,12 @@ async def create_audit_log(
     changed_fields = _compute_changed_fields(before_state, after_state)
 
     audit = AuditLog(
-        tenant_id=tenant_id,
-        actor_id=actor_id,
+        tenant_id=_to_uuid(tenant_id, "tenant_id", required=True),
+        actor_id=_to_uuid(actor_id, "actor_id"),
         actor_email=actor_email,
         action=action,
         entity_type=entity_type,
-        entity_id=entity_id,
+        entity_id=_to_uuid(entity_id, "entity_id", required=True),
         before_state=before_state,
         after_state=after_state,
         changed_fields=changed_fields,

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:dio/dio.dart';
 import '../datasources/api/api_client.dart';
 import '../models/user.dart';
 import '../../services/storage_service.dart';
 import '../../services/local_cache_service.dart';
+import '../../services/notification_service.dart';
 
 class AuthRepository {
   final ApiClient _api;
@@ -18,13 +21,22 @@ class AuthRepository {
        _cache = cache;
 
   Future<User> login(String email, String password) async {
-    final data = await _api.login(email, password);
-    await _storage.saveTokens(
-      accessToken: data['access_token'],
-      refreshToken: data['refresh_token'],
-    );
-    // Login response doesn't include user — fetch via /auth/me
-    return getMe();
+    try {
+      final data = await _api.login(email, password);
+      await _storage.saveTokens(
+        accessToken: data['access_token'],
+        refreshToken: data['refresh_token'],
+      );
+
+      // Login response doesn't include user — fetch profile after tokens are stored.
+      final user = await getMe();
+      return user;
+    } catch (e) {
+      // Prevent stale tokens from keeping the app in an authenticated route state.
+      await _storage.clearTokens();
+      await _cache.clearCache();
+      rethrow;
+    }
   }
 
   Future<User> getMe() async {
@@ -61,4 +73,20 @@ class AuthRepository {
   }
 
   Future<bool> isAuthenticated() => _storage.hasTokens;
+
+  Future<void> registerCurrentDeviceToken() async {
+    try {
+      final token = await NotificationService().getFcmToken();
+      if (token == null || token.isEmpty) return;
+      await _api.updateFCMToken(token, _deviceType());
+    } catch (_) {
+      // Device registration should not block authentication flow.
+    }
+  }
+
+  String _deviceType() {
+    if (kIsWeb) return 'web';
+    if (defaultTargetPlatform == TargetPlatform.iOS) return 'ios';
+    return 'android';
+  }
 }

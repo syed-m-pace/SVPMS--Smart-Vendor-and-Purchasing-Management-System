@@ -23,7 +23,7 @@ class Vendor {
       legalName: json['legal_name'] ?? json['legalName'] ?? '',
       email: json['email'] ?? '',
       contactPerson: json['contact_person'] ?? json['contactPerson'],
-      gstNumber: json['gst_number'] ?? json['gstNumber'],
+      gstNumber: json['tax_id'] ?? json['gst_number'] ?? json['gstNumber'],
       bankAccount: json['bank_account'] ?? json['bankAccount'],
       status: json['status'] ?? 'ACTIVE',
     );

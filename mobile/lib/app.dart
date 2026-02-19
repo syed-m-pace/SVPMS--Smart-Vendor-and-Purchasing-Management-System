@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'core/constants/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'data/datasources/api/api_client.dart';
@@ -15,6 +17,13 @@ import 'presentation/purchase_orders/bloc/po_bloc.dart';
 import 'presentation/rfqs/bloc/rfq_bloc.dart';
 import 'services/local_cache_service.dart';
 import 'services/storage_service.dart';
+import 'services/notification_service.dart';
+
+String _deviceType() {
+  if (kIsWeb) return 'web';
+  if (defaultTargetPlatform == TargetPlatform.iOS) return 'ios';
+  return 'android';
+}
 
 class SVPMSApp extends StatelessWidget {
   final LocalCacheService localCache;
@@ -32,6 +41,9 @@ class SVPMSApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final storage = storageService ?? StorageService();
     final apiClient = ApiClient(storage: storage);
+    NotificationService().setOnTokenRefresh((token) async {
+      await apiClient.updateFCMToken(token, _deviceType());
+    });
 
     final authRepo =
         authRepository ??

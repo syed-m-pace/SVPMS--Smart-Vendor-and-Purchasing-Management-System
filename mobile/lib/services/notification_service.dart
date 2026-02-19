@@ -14,9 +14,14 @@ class NotificationService {
 
   GoRouter? _router;
   bool _isInitialized = false;
+  Future<void> Function(String token)? _onTokenRefresh;
 
   void setRouter(GoRouter router) {
     _router = router;
+  }
+
+  void setOnTokenRefresh(Future<void> Function(String token) callback) {
+    _onTokenRefresh = callback;
   }
 
   Future<void> initialize() async {
@@ -65,6 +70,12 @@ class NotificationService {
 
     // 4. Background/Terminated Message Handler
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
+    _fcm.onTokenRefresh.listen((token) {
+      final callback = _onTokenRefresh;
+      if (callback != null) {
+        callback(token);
+      }
+    });
 
     final initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {

@@ -13,17 +13,24 @@ const statusConfig: Record<string, { label: string; variant: "success" | "warnin
     ACKNOWLEDGED: { label: "Acknowledged", variant: "info" },
     PARTIALLY_RECEIVED: { label: "Partial", variant: "warning" },
     FULLY_RECEIVED: { label: "Received", variant: "success" },
+    PARTIALLY_FULFILLED: { label: "Partial", variant: "warning" },
+    FULFILLED: { label: "Fulfilled", variant: "success" },
     CLOSED: { label: "Closed", variant: "secondary" },
 
     // Invoice statuses
+    UPLOADED: { label: "Uploaded", variant: "accent" },
     SUBMITTED: { label: "Submitted", variant: "accent" },
     UNDER_REVIEW: { label: "Reviewing", variant: "info" },
+    MATCHED: { label: "Matched", variant: "success" },
+    DISPUTED: { label: "Disputed", variant: "warning" },
     PAID: { label: "Paid", variant: "success" },
     EXCEPTION: { label: "Exception", variant: "destructive" },
 
     // Match statuses
-    MATCHED: { label: "Matched", variant: "success" },
     MISMATCHED: { label: "Mismatched", variant: "destructive" },
+    PASS: { label: "Pass", variant: "success" },
+    FAIL: { label: "Fail", variant: "destructive" },
+    OVERRIDE: { label: "Override", variant: "warning" },
 
     // Vendor statuses
     ACTIVE: { label: "Active", variant: "success" },

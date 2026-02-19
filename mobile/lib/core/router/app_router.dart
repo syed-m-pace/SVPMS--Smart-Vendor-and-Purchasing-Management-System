@@ -30,7 +30,15 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
     initialLocation: '/dashboard',
     refreshListenable: authNotifier,
     redirect: (context, state) async {
-      final loggedIn = await storage.hasTokens;
+      final authState = authBloc.state;
+      bool loggedIn;
+      if (authState is Authenticated) {
+        loggedIn = true;
+      } else if (authState is Unauthenticated || authState is AuthError) {
+        loggedIn = false;
+      } else {
+        loggedIn = await storage.hasTokens;
+      }
       final onLogin = state.matchedLocation == '/login';
       if (!loggedIn && !onLogin) return '/login';
       if (loggedIn && onLogin) return '/dashboard';

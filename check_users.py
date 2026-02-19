@@ -9,11 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from api.models.user import User
 from api.models.vendor import Vendor
-from api.database import Base
 from sqlalchemy.orm import sessionmaker
 
-# Use the production DB URL (or development if testing locally)
-DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_kTG3w6DYoNrZ@ep-winter-flower-abhsz7sw-pooler.eu-west-2.aws.neon.tech/neondb"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise SystemExit("DATABASE_URL is required")
 
 async def check_users():
     engine = create_async_engine(DATABASE_URL)

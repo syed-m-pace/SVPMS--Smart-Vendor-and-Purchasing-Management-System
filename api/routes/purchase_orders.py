@@ -1,7 +1,8 @@
 from datetime import datetime, date as date_type
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy import case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -10,9 +11,11 @@ from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
 from api.models.purchase_order import PurchaseOrder, PoLineItem
 from api.models.purchase_request import PurchaseRequest, PrLineItem
+from api.models.user import User
 from api.models.vendor import Vendor
 from api.schemas.purchase_order import (
     PurchaseOrderCreate,
+    PurchaseOrderReadyResponse,
     PurchaseOrderResponse,
     PoLineItemResponse,
     CancelRequest,
@@ -20,6 +23,8 @@ from api.schemas.purchase_order import (
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.budget_service import release_budget_reservation
 from api.services.audit_service import create_audit_log
+from api.services.notification_service import send_notification
+from api.services.push_service import send_push
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -54,6 +59,7 @@ def _to_response(po: PurchaseOrder, line_items: list[PoLineItem]) -> PurchaseOrd
         status=po.status,
         total_cents=po.total_cents,
         currency=po.currency,
+        issued_at=po.issued_at.isoformat() if po.issued_at else None,
         expected_delivery_date=(
             po.expected_delivery_date.isoformat() if po.expected_delivery_date else None
         ),
@@ -64,11 +70,43 @@ def _to_response(po: PurchaseOrder, line_items: list[PoLineItem]) -> PurchaseOrd
     )
 
 
+def _ready_to_response(pr: PurchaseRequest) -> PurchaseOrderReadyResponse:
+    return PurchaseOrderReadyResponse(
+        pr_id=str(pr.id),
+        pr_number=pr.pr_number,
+        requester_id=str(pr.requester_id),
+        department_id=str(pr.department_id),
+        total_cents=pr.total_cents,
+        currency=pr.currency,
+        description=pr.description,
+        approved_at=pr.approved_at.isoformat() if pr.approved_at else None,
+        created_at=pr.created_at.isoformat() if pr.created_at else "",
+    )
+
+
 async def _get_line_items(db: AsyncSession, po_id) -> list[PoLineItem]:
     result = await db.execute(
         select(PoLineItem).where(PoLineItem.po_id == po_id).order_by(PoLineItem.line_number)
     )
     return list(result.scalars().all())
+
+
+async def _resolve_vendor_for_user(
+    db: AsyncSession, current_user: dict
+) -> Optional[Vendor]:
+    result = await db.execute(
+        select(Vendor)
+        .where(
+            Vendor.tenant_id == current_user["tenant_id"],
+            Vendor.email == current_user["email"],
+            Vendor.deleted_at == None,  # noqa: E711
+        )
+        .order_by(
+            case((Vendor.status == "ACTIVE", 0), else_=1),
+            Vendor.created_at.asc(),
+        )
+    )
+    return result.scalars().first()
 
 
 @router.get("", response_model=PaginatedResponse[PurchaseOrderResponse])
@@ -84,10 +122,23 @@ async def list_purchase_orders(
     q = select(PurchaseOrder).where(PurchaseOrder.deleted_at == None)  # noqa: E711
     count_q = select(func.count(PurchaseOrder.id)).where(PurchaseOrder.deleted_at == None)  # noqa: E711
 
+    scoped_vendor_id = None
+    if current_user["role"] == "vendor":
+        vendor = await _resolve_vendor_for_user(db, current_user)
+        if not vendor:
+            return PaginatedResponse(
+                data=[],
+                pagination=build_pagination(page, limit, 0),
+            )
+        scoped_vendor_id = vendor.id
+
     if po_status:
         q = q.where(PurchaseOrder.status == po_status)
         count_q = count_q.where(PurchaseOrder.status == po_status)
-    if vendor_id:
+    if scoped_vendor_id is not None:
+        q = q.where(PurchaseOrder.vendor_id == scoped_vendor_id)
+        count_q = count_q.where(PurchaseOrder.vendor_id == scoped_vendor_id)
+    elif vendor_id:
         q = q.where(PurchaseOrder.vendor_id == vendor_id)
         count_q = count_q.where(PurchaseOrder.vendor_id == vendor_id)
     if pr_id:
@@ -108,6 +159,57 @@ async def list_purchase_orders(
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
 
+@router.get("/ready", response_model=PaginatedResponse[PurchaseOrderReadyResponse])
+async def list_ready_purchase_orders(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(
+        require_roles(
+            "procurement",
+            "procurement_lead",
+            "admin",
+            "manager",
+            "finance",
+            "finance_head",
+            "cfo",
+        )
+    ),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    active_po_exists = exists(
+        select(PurchaseOrder.id).where(
+            PurchaseOrder.pr_id == PurchaseRequest.id,
+            PurchaseOrder.deleted_at == None,  # noqa: E711
+            PurchaseOrder.status != "CANCELLED",
+        )
+    )
+
+    q = select(PurchaseRequest).where(
+        PurchaseRequest.deleted_at == None,  # noqa: E711
+        PurchaseRequest.status == "APPROVED",
+        ~active_po_exists,
+    )
+    count_q = select(func.count(PurchaseRequest.id)).where(
+        PurchaseRequest.deleted_at == None,  # noqa: E711
+        PurchaseRequest.status == "APPROVED",
+        ~active_po_exists,
+    )
+
+    total = (await db.execute(count_q)).scalar() or 0
+    result = await db.execute(
+        q.order_by(PurchaseRequest.approved_at.desc(), PurchaseRequest.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+    )
+    prs = result.scalars().all()
+
+    return PaginatedResponse(
+        data=[_ready_to_response(pr) for pr in prs],
+        pagination=build_pagination(page, limit, total),
+    )
+
+
 @router.get("/{po_id}", response_model=PurchaseOrderResponse)
 async def get_purchase_order(
     po_id: str,
@@ -123,6 +225,11 @@ async def get_purchase_order(
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
 
+    if current_user["role"] == "vendor":
+        vendor = await _resolve_vendor_for_user(db, current_user)
+        if not vendor or po.vendor_id != vendor.id:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+
     line_items = await _get_line_items(db, po.id)
     return _to_response(po, line_items)
 
@@ -130,6 +237,7 @@ async def get_purchase_order(
 @router.post("", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_purchase_order(
     body: PurchaseOrderCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -198,6 +306,7 @@ async def create_purchase_order(
         pr_id=pr.id,
         vendor_id=vendor.id,
         status="ISSUED",
+        issued_at=datetime.utcnow(),
         total_cents=pr.total_cents,
         currency=pr.currency,
         expected_delivery_date=delivery_date,
@@ -223,6 +332,50 @@ async def create_purchase_order(
 
     await db.flush()
     line_items = await _get_line_items(db, po.id)
+
+    # Notify vendor via push + email. Failures should not block PO creation.
+    try:
+        vendor_user_ids_result = await db.execute(
+            select(User.id).where(
+                User.email == vendor.email,
+                User.role == "vendor",
+                User.is_active == True,  # noqa: E712
+                User.deleted_at == None,  # noqa: E711
+            )
+        )
+        vendor_user_ids = [str(row[0]) for row in vendor_user_ids_result.all()]
+        if vendor_user_ids:
+            await send_push(
+                db,
+                user_ids=vendor_user_ids,
+                title="New purchase order issued",
+                body=f"{po.po_number} has been issued to your account.",
+                data={
+                    "type": "NEW_PO",
+                    "id": str(po.id),
+                    "po_id": str(po.id),
+                    "po_number": po.po_number,
+                },
+            )
+
+        background_tasks.add_task(
+            send_notification,
+            "po_issued",
+            [vendor.email],
+            {
+                "po_number": po.po_number,
+                "currency": po.currency,
+                "amount_cents": po.total_cents,
+            },
+        )
+    except Exception as exc:
+        logger.error(
+            "po_vendor_notification_failed",
+            po_id=str(po.id),
+            vendor_id=str(vendor.id),
+            error=str(exc),
+        )
+
     logger.info("po_created", po_id=str(po.id), po_number=po.po_number, pr_id=str(pr.id))
     return _to_response(po, line_items)
 
@@ -231,6 +384,7 @@ async def create_purchase_order(
 async def acknowledge_purchase_order(
     po_id: str,
     current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("vendor")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     """Vendor acknowledges a purchase order."""
@@ -241,6 +395,10 @@ async def acknowledge_purchase_order(
     )
     po = result.scalar_one_or_none()
     if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    vendor = await _resolve_vendor_for_user(db, current_user)
+    if not vendor or po.vendor_id != vendor.id:
         raise HTTPException(status_code=404, detail="Purchase order not found")
 
     if po.status != "ISSUED":

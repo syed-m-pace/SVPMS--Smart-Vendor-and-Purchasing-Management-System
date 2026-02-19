@@ -12,7 +12,11 @@ import structlog
 
 from api.database import AsyncSessionLocal, set_tenant_context
 from api.models.invoice import Invoice
-from api.services.ocr import extract_invoice_data
+from api.services.ocr import (
+    SUPPORTED_MIME_TYPES,
+    extract_invoice_data,
+    infer_mime_type_from_key,
+)
 from api.services.storage import r2_client
 from api.services.audit_service import create_audit_log
 
@@ -38,14 +42,38 @@ async def process_invoice_ocr(invoice_id: str, tenant_id: str):
                 logger.warning("ocr_no_document", invoice_id=invoice_id)
                 return
 
+            document_key = r2_client.extract_key(invoice.document_url)
+            if not document_key:
+                logger.warning(
+                    "ocr_invalid_document_reference",
+                    invoice_id=invoice_id,
+                    document_url=invoice.document_url,
+                )
+                invoice.ocr_status = "FAILED"
+                await session.commit()
+                return
+
+            mime_type = infer_mime_type_from_key(document_key)
+            if mime_type not in SUPPORTED_MIME_TYPES:
+                logger.warning(
+                    "ocr_unsupported_format",
+                    invoice_id=invoice_id,
+                    mime_type=mime_type,
+                    document_key=document_key,
+                )
+                invoice.ocr_status = "UNSUPPORTED_FORMAT"
+                await session.commit()
+                return
+
             # 2. Download from R2
             try:
-                file_bytes = r2_client.download(invoice.document_url)
+                file_bytes = r2_client.download(document_key)
             except Exception as e:
                 logger.error(
                     "ocr_download_failed",
                     invoice_id=invoice_id,
                     document_url=invoice.document_url,
+                    document_key=document_key,
                     error=str(e),
                 )
                 invoice.ocr_status = "FAILED"
@@ -53,7 +81,7 @@ async def process_invoice_ocr(invoice_id: str, tenant_id: str):
                 return
 
             # 3. Run Google Document AI
-            ocr_data = extract_invoice_data(file_bytes)
+            ocr_data = extract_invoice_data(file_bytes, mime_type=mime_type)
 
             if not ocr_data:
                 logger.warning("ocr_no_data_extracted", invoice_id=invoice_id)
@@ -67,6 +95,7 @@ async def process_invoice_ocr(invoice_id: str, tenant_id: str):
                 "ocr_status": getattr(invoice, "ocr_status", None),
                 "invoice_number": invoice.invoice_number,
                 "total_cents": invoice.total_cents,
+                "document_url": invoice.document_url,
             }
 
             invoice.ocr_status = "COMPLETE" if confidence >= 0.85 else "LOW_CONFIDENCE"
@@ -82,6 +111,7 @@ async def process_invoice_ocr(invoice_id: str, tenant_id: str):
                 "ocr_status": invoice.ocr_status,
                 "invoice_number": invoice.invoice_number,
                 "total_cents": invoice.total_cents,
+                "document_url": invoice.document_url,
             }
 
             await create_audit_log(

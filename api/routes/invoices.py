@@ -19,6 +19,7 @@ from api.schemas.invoice import (
 )
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
+from api.services.storage import r2_client
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -48,6 +49,9 @@ def _to_response(inv: Invoice, line_items: list[InvoiceLineItem]) -> InvoiceResp
         currency=inv.currency,
         document_url=inv.document_url,
         match_status=inv.match_status,
+        ocr_status=inv.ocr_status,
+        ocr_data=inv.ocr_data,
+        match_exceptions=inv.match_exceptions,
         line_items=[_line_to_response(li) for li in line_items],
         created_at=inv.created_at.isoformat() if inv.created_at else "",
         updated_at=inv.updated_at.isoformat() if inv.updated_at else "",
@@ -194,9 +198,16 @@ async def create_invoice(
     line_items = await _get_line_items(db, inv.id)
     logger.info("invoice_created", invoice_id=str(inv.id), po_id=str(po.id))
 
-    # Queue OCR background task if document_url is set
-    if getattr(body, "document_url", None):
-        inv.document_url = body.document_url
+    # Normalize document reference and queue OCR if available.
+    raw_document_ref = body.document_key or body.document_url
+    if raw_document_ref:
+        document_key = r2_client.extract_key(raw_document_ref)
+        if not document_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid invoice document reference",
+            )
+        inv.document_url = document_key
         await db.flush()
         from api.jobs.invoice_ocr import process_invoice_ocr
         background_tasks.add_task(

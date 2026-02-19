@@ -14,6 +14,8 @@ class InvoiceCreate(BaseModel):
     invoice_date: str
     due_date: Optional[str] = None
     total_cents: int = Field(..., ge=1)
+    document_key: Optional[str] = None
+    document_url: Optional[str] = None
     line_items: List[InvoiceLineItemCreate] = Field(default_factory=list)
 
 
@@ -40,6 +42,9 @@ class InvoiceResponse(BaseModel):
     currency: str
     document_url: Optional[str] = None
     match_status: Optional[str] = None
+    ocr_status: Optional[str] = None
+    ocr_data: Optional[dict] = None
+    match_exceptions: Optional[dict] = None
     line_items: List[InvoiceLineItemResponse] = []
     created_at: str
     updated_at: str

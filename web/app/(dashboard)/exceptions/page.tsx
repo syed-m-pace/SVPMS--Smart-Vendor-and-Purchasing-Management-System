@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { invoiceService } from "@/lib/api/invoices";
 import { formatCurrency } from "@/lib/utils";
 import type { Invoice } from "@/types/models";
 import { toast } from "sonner";
+import { isAxiosError } from "axios";
 
 export default function ExceptionsPage() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -19,6 +20,16 @@ export default function ExceptionsPage() {
         invoiceService.list({ status: "EXCEPTION" }).then((r) => setInvoices(r.data)).catch(() => { }).finally(() => setLoading(false));
     }, []);
 
+    const getErrorMessage = (error: unknown, fallback: string) => {
+        if (isAxiosError(error)) {
+            const detail = error.response?.data?.detail;
+            if (typeof detail === "string") return detail;
+            const nested = error.response?.data?.detail?.error?.message;
+            if (typeof nested === "string") return nested;
+        }
+        return fallback;
+    };
+
     async function handleOverride(id: string) {
         const reason = prompt("Override reason:");
         if (!reason) return;
@@ -27,7 +38,9 @@ export default function ExceptionsPage() {
             await invoiceService.override(id, reason);
             toast.success("Exception resolved");
             setInvoices(prev => prev.filter(i => i.id !== id));
-        } catch (e: any) { toast.error(e.response?.data?.detail?.error?.message || "Failed"); } finally { setResolving(null); }
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, "Failed"));
+        } finally { setResolving(null); }
     }
 
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>;
@@ -50,6 +63,10 @@ export default function ExceptionsPage() {
             ) : (
                 <div className="space-y-3">
                     {invoices.map((inv) => (
+                        (() => {
+                            const exceptions = inv.match_exceptions?.exceptions;
+                            const issueCount = Array.isArray(exceptions) ? exceptions.length : 0;
+                            return (
                         <Card key={inv.id} className="border-destructive/20">
                             <CardContent className="p-5 flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-4 flex-1">
@@ -60,7 +77,7 @@ export default function ExceptionsPage() {
                                         <p className="font-medium font-mono">{inv.invoice_number}</p>
                                         <p className="text-sm text-muted-foreground">
                                             {formatCurrency(inv.total_cents)}
-                                            {inv.exception_details?.length ? ` • ${inv.exception_details.length} issue(s)` : ""}
+                                            {issueCount ? ` • ${issueCount} issue(s)` : ""}
                                         </p>
                                     </div>
                                 </div>
@@ -73,6 +90,8 @@ export default function ExceptionsPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                            );
+                        })()
                     ))}
                 </div>
             )}

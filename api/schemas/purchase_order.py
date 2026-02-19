@@ -29,11 +29,26 @@ class PurchaseOrderResponse(BaseModel):
     status: str
     total_cents: int
     currency: str
+    issued_at: Optional[str] = None
     expected_delivery_date: Optional[str] = None
     terms_and_conditions: Optional[str] = None
     line_items: List[PoLineItemResponse] = []
     created_at: str
     updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class PurchaseOrderReadyResponse(BaseModel):
+    pr_id: str
+    pr_number: str
+    requester_id: str
+    department_id: str
+    total_cents: int
+    currency: str
+    description: Optional[str] = None
+    approved_at: Optional[str] = None
+    created_at: str
 
     model_config = {"from_attributes": True}
 

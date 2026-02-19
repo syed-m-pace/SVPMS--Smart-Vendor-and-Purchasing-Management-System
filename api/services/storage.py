@@ -3,6 +3,8 @@ import boto3
 from botocore.config import Config
 from api.config import settings
 import structlog
+from typing import Optional
+from urllib.parse import unquote, urlparse
 
 logger = structlog.get_logger()
 
@@ -41,6 +43,24 @@ class R2Client:
     def delete(self, key: str):
         self.s3.delete_object(Bucket=self.bucket, Key=key)
         logger.info("r2_deleted", key=key)
+
+    def extract_key(self, key_or_url: Optional[str]) -> Optional[str]:
+        if not key_or_url:
+            return None
+        value = key_or_url.strip()
+        if not value:
+            return None
+
+        if value.startswith("http://") or value.startswith("https://"):
+            parsed = urlparse(value)
+            path = unquote(parsed.path or "").lstrip("/")
+            if not path:
+                return None
+            if path.startswith(f"{self.bucket}/"):
+                return path[len(self.bucket) + 1 :]
+            return path
+
+        return value
 
 
 r2_client = R2Client()
