@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { vendorService } from "@/lib/api/vendors";
+import { useAuthStore } from "@/lib/stores/auth";
 import { formatDate } from "@/lib/utils";
 import type { Vendor } from "@/types/models";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 export default function VendorDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const user = useAuthStore((s) => s.user);
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [loading, setLoading] = useState(true);
     const [blockOpen, setBlockOpen] = useState(false);
@@ -29,9 +31,20 @@ export default function VendorDetailPage() {
 
     if (loading) return <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-accent" /></div>;
     if (!vendor) return <p>Vendor not found</p>;
+    const canApprove = ["admin", "manager", "procurement_lead"].includes(user?.role || "");
+    const canBlock = ["admin", "manager", "procurement_lead"].includes(user?.role || "");
 
     async function handleApprove() {
-        try { await vendorService.approve(vendor!.id); toast.success("Vendor approved"); setVendor({ ...vendor!, status: "ACTIVE" }); } catch { toast.error("Failed"); }
+        setProcessing(true);
+        try {
+            const updated = await vendorService.approve(vendor!.id);
+            toast.success("Vendor approved");
+            setVendor(updated);
+        } catch {
+            toast.error("Failed to approve vendor");
+        } finally {
+            setProcessing(false);
+        }
     }
 
     async function handleBlock() {
@@ -55,11 +68,14 @@ export default function VendorDetailPage() {
                     <p className="text-muted-foreground">{vendor.email}</p>
                 </div>
                 <StatusBadge status={vendor.status} />
-                {vendor.status === "PENDING_REVIEW" && (
-                    <Button onClick={handleApprove} variant="success" size="sm"><CheckCircle className="mr-2 h-4 w-4" />Approve</Button>
+                {canApprove && (vendor.status === "DRAFT" || vendor.status === "PENDING_REVIEW") && (
+                    <Button onClick={handleApprove} variant="success" size="sm" disabled={processing}>
+                        {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                        Approve
+                    </Button>
                 )}
-                {vendor.status === "ACTIVE" && (
-                    <Button onClick={() => setBlockOpen(true)} variant="destructive" size="sm"><Ban className="mr-2 h-4 w-4" />Block</Button>
+                {canBlock && vendor.status === "ACTIVE" && (
+                    <Button onClick={() => setBlockOpen(true)} variant="destructive" size="sm" disabled={processing}><Ban className="mr-2 h-4 w-4" />Block</Button>
                 )}
             </div>
 
@@ -69,8 +85,8 @@ export default function VendorDetailPage() {
                     <CardContent className="space-y-3 text-sm">
                         <Row label="Tax ID" value={vendor.tax_id} />
                         <Row label="Phone" value={vendor.phone || "—"} />
-                        <Row label="Risk Score" value={String(vendor.risk_score)} />
-                        <Row label="Rating" value={`${vendor.rating}/10`} />
+                        <Row label="Risk Score" value={String(vendor.risk_score ?? 0)} />
+                        <Row label="Rating" value={`${vendor.rating ?? 0}/10`} />
                         <Row label="Created" value={formatDate(vendor.created_at)} />
                     </CardContent>
                 </Card>

@@ -9,6 +9,7 @@ from api.middleware.auth import get_current_user
 from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles, check_self_approval
 from api.models.purchase_request import PurchaseRequest, PrLineItem
+from api.models.approval import Approval
 from api.models.user import User
 from api.schemas.purchase_request import (
     PurchaseRequestCreate,
@@ -17,6 +18,7 @@ from api.schemas.purchase_request import (
     PrLineItemResponse,
     ApproveRejectRequest,
     RejectRequest,
+    RetractRequest,
 )
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.budget_service import (
@@ -307,6 +309,52 @@ async def update_purchase_request(
     return _to_response(pr, line_items)
 
 
+@router.delete("/{pr_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_purchase_request(
+    pr_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(
+        select(PurchaseRequest).where(
+            PurchaseRequest.id == pr_id, PurchaseRequest.deleted_at == None  # noqa: E711
+        )
+    )
+    pr = result.scalar_one_or_none()
+    if not pr:
+        raise HTTPException(status_code=404, detail="Purchase request not found")
+
+    if pr.status != "DRAFT":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only delete purchase requests in DRAFT status",
+        )
+
+    if str(pr.requester_id) != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the requester can delete this purchase request",
+        )
+
+    before = {"status": pr.status, "deleted_at": None}
+    pr.deleted_at = datetime.utcnow()
+    after = {"status": pr.status, "deleted_at": pr.deleted_at.isoformat()}
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="PR_DELETED",
+        entity_type="PR",
+        entity_id=str(pr.id),
+        before_state=before,
+        after_state=after,
+        actor_email=current_user.get("email"),
+    )
+
+    await db.flush()
+
+
 # ---------- SUBMIT ----------
 
 
@@ -433,6 +481,72 @@ async def submit_purchase_request(
 
     line_items = await _get_line_items(db, pr.id)
     logger.info("pr_submitted", pr_id=str(pr.id), pr_number=pr.pr_number)
+    return _to_response(pr, line_items)
+
+
+@router.post("/{pr_id}/retract", response_model=PurchaseRequestResponse)
+async def retract_purchase_request(
+    pr_id: str,
+    body: RetractRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(
+        select(PurchaseRequest).where(
+            PurchaseRequest.id == pr_id, PurchaseRequest.deleted_at == None  # noqa: E711
+        )
+    )
+    pr = result.scalar_one_or_none()
+    if not pr:
+        raise HTTPException(status_code=404, detail="Purchase request not found")
+
+    if pr.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only retract purchase requests in PENDING status",
+        )
+
+    if str(pr.requester_id) != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the requester can retract this purchase request",
+        )
+
+    # Release budget reservation for this PR.
+    await release_budget_reservation(db, "PR", str(pr.id))
+
+    # Cancel all pending approvals for this PR.
+    approvals_result = await db.execute(
+        select(Approval).where(
+            Approval.entity_type == "PR",
+            Approval.entity_id == pr.id,
+            Approval.status == "PENDING",
+        )
+    )
+    for approval in approvals_result.scalars().all():
+        approval.status = "CANCELLED"
+        if body.reason:
+            approval.comments = f"Retracted by requester: {body.reason}"
+
+    before = {"status": pr.status}
+    pr.status = "CANCELLED"
+    after = {"status": pr.status}
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="PR_RETRACTED",
+        entity_type="PR",
+        entity_id=str(pr.id),
+        before_state=before,
+        after_state=after,
+        actor_email=current_user.get("email"),
+    )
+
+    await db.flush()
+    line_items = await _get_line_items(db, pr.id)
+    logger.info("pr_retracted", pr_id=str(pr.id), by=current_user["user_id"])
     return _to_response(pr, line_items)
 
 

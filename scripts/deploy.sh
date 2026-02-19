@@ -19,7 +19,7 @@ export PATH=$PATH:/Users/pacewisdom/google-cloud-sdk/bin
 # ---- Configuration ----
 PROJECT_ID="${GCP_PROJECT_ID:-svpms-cloud}"
 REGION="${GCP_REGION:-asia-south1}"
-SERVICE_NAME="svpms-api"
+SERVICE_NAME="${GCP_CLOUD_RUN_SERVICE:-svpms-be-gcloud}"
 IMAGE_NAME="svpms-backend"
 REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/svpms"
 IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}:$(date +%Y%m%d-%H%M%S)"
@@ -65,8 +65,13 @@ if [ "${DRY_RUN}" = true ]; then
     exit 0
 fi
 
-# Skip Step 4 as it's handled by Cloud Build
-echo "▶ [4/5] Image already pushed by Cloud Build."
+# ---- Step 4: Prepare Environment Variables ----
+echo "▶ [4/5] Preparing environment variables..."
+if [ -f ".venv/bin/python" ]; then
+    .venv/bin/python scripts/prepare_deploy_env.py
+else
+    python3 scripts/prepare_deploy_env.py
+fi
 
 # ---- Step 5: Deploy to Cloud Run ----
 echo "▶ [5/5] Deploying to Cloud Run..."
@@ -81,7 +86,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --max-instances=3 \
     --timeout=300 \
     --allow-unauthenticated \
-    --set-env-vars="ENVIRONMENT=production,APP_VERSION=$(date +%Y%m%d)" \
+    --env-vars-file=env.yaml \
     --quiet
 
 echo ""

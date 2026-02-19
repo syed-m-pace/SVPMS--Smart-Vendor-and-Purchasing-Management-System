@@ -10,6 +10,7 @@ from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
 from api.models.vendor import Vendor
 from api.models.purchase_order import PurchaseOrder
+from api.models.audit_log import AuditLog
 from api.schemas.vendor import (
     VendorCreate,
     VendorUpdate,
@@ -60,6 +61,26 @@ async def list_vendors(
         pattern = f"%{search}%"
         q = q.where(or_(Vendor.legal_name.ilike(pattern), Vendor.tax_id.ilike(pattern)))
         count_q = count_q.where(or_(Vendor.legal_name.ilike(pattern), Vendor.tax_id.ilike(pattern)))
+
+    # Admins can see all non-draft vendors, but only their own draft vendors.
+    if current_user["role"] == "admin":
+        own_draft_vendor_ids = select(AuditLog.entity_id).where(
+            AuditLog.entity_type == "VENDOR",
+            AuditLog.action == "VENDOR_CREATED",
+            AuditLog.actor_id == current_user["user_id"],
+        )
+        q = q.where(
+            or_(
+                Vendor.status != "DRAFT",
+                Vendor.id.in_(own_draft_vendor_ids),
+            )
+        )
+        count_q = count_q.where(
+            or_(
+                Vendor.status != "DRAFT",
+                Vendor.id.in_(own_draft_vendor_ids),
+            )
+        )
 
     total = (await db.execute(count_q)).scalar() or 0
     result = await db.execute(
@@ -138,12 +159,27 @@ async def create_vendor(
         email=body.email,
         phone=body.phone,
         status="DRAFT",
+        risk_score=0,
+        rating=0,
         bank_name=body.bank_name,
         ifsc_code=body.ifsc_code,
         bank_account_number_encrypted=body.bank_account_number,
     )
     db.add(vendor)
     await db.flush()
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="VENDOR_CREATED",
+        entity_type="VENDOR",
+        entity_id=str(vendor.id),
+        before_state=None,
+        after_state={"status": vendor.status},
+        actor_email=current_user.get("email"),
+    )
+
     return _to_response(vendor)
 
 
@@ -205,7 +241,7 @@ async def delete_vendor(
 async def approve_vendor(
     vendor_id: str,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("procurement_lead", "admin")),
+    _auth: None = Depends(require_roles("manager", "procurement_lead", "admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(

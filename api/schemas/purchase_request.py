@@ -61,3 +61,7 @@ class ApproveRejectRequest(BaseModel):
 
 class RejectRequest(BaseModel):
     reason: str = Field(..., min_length=10, max_length=1000)
+
+
+class RetractRequest(BaseModel):
+    reason: Optional[str] = Field(None, min_length=3, max_length=1000)

@@ -15,7 +15,9 @@ export interface User {
 export type UserRole =
     | "admin"
     | "manager"
+    | "procurement_lead"
     | "procurement"
+    | "finance"
     | "finance_head"
     | "cfo"
     | "viewer"
@@ -46,6 +48,7 @@ export interface Vendor {
 }
 
 export type VendorStatus =
+    | "DRAFT"
     | "PENDING_REVIEW"
     | "ACTIVE"
     | "BLOCKED"
@@ -148,7 +151,7 @@ export interface Invoice {
     match_status: MatchStatus | null;
     ocr_status: string | null;
     s3_url: string | null;
-    exception_details: any[] | null;
+    exception_details: unknown[] | null;
     line_items: InvoiceLineItem[];
     created_at: string;
     vendor?: Vendor;
