@@ -18,6 +18,7 @@
 - **Naive vs aware datetimes**: DB columns are `TIMESTAMP WITHOUT TIME ZONE`. Use `datetime.utcnow()` not `datetime.now(timezone.utc)` for asyncpg compatibility.
 - **EmailStr needs email-validator**: Pydantic v2 `EmailStr` requires `pip install email-validator` (not in requirements.txt by default).
 - **No explicit db.commit() in routes**: `get_db()` auto-commits on success. Use `await db.flush()` in routes to write to DB within the transaction. Explicit `commit()` breaks atomicity.
+- **CORS on Cloud Run**: Variables like `CORS_ORIGINS` must be explicitly passed in `env.yaml` (converted from `.env`). If frontend domain (e.g. Vercel) is missing, CORS preflight fails.
 
 ## Build Phase Status
 - Phase 1: Scaffold + Boot **COMPLETE** (22 tables, 16 RLS, /health 200)

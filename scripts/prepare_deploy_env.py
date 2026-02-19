@@ -35,6 +35,14 @@ def main():
     from datetime import datetime
     env_vars['APP_VERSION'] = datetime.now().strftime("%Y%m%d")
 
+    # Add Vercel URL to CORS_ORIGINS for production
+    vercel_url = "https://svpms-smart-vendor-and-purchasing-m.vercel.app"
+    if 'CORS_ORIGINS' in env_vars:
+        if vercel_url not in env_vars['CORS_ORIGINS']:
+            env_vars['CORS_ORIGINS'] += f",{vercel_url}"
+    else:
+        env_vars['CORS_ORIGINS'] = vercel_url
+
     # Remove PORT as Cloud Run injects it
     if 'PORT' in env_vars:
         del env_vars['PORT']
