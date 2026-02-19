@@ -54,4 +54,13 @@ class LocalCacheService {
     final data = getCachedData('pos_list');
     return data != null ? List<dynamic>.from(data) : null;
   }
+
+  Future<void> cacheRFQs(List<dynamic> rfqsJson) async {
+    await cacheData('rfqs_list', rfqsJson);
+  }
+
+  List<dynamic>? getCachedRFQs() {
+    final data = getCachedData('rfqs_list');
+    return data != null ? List<dynamic>.from(data) : null;
+  }
 }

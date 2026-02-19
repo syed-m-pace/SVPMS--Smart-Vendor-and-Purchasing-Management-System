@@ -1,7 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../purchase_orders/bloc/po_bloc.dart';
 import '../bloc/invoice_bloc.dart';
 
 class InvoiceUploadScreen extends StatefulWidget {
@@ -13,17 +16,27 @@ class InvoiceUploadScreen extends StatefulWidget {
 
 class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _poIdCtrl = TextEditingController();
+  String? _selectedPoId;
   final _numberCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
   DateTime? _date;
+  PlatformFile? _selectedFile;
 
   @override
   void dispose() {
-    _poIdCtrl.dispose();
     _numberCtrl.dispose();
     _amountCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+    if (result != null) {
+      setState(() => _selectedFile = result.files.first);
+    }
   }
 
   @override
@@ -57,16 +70,43 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextFormField(
-                  controller: _poIdCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Purchase Order ID',
-                    prefixIcon: Icon(Icons.shopping_cart),
-                  ),
-                  validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                // ── PO Dropdown ──
+                BlocBuilder<POBloc, POState>(
+                  builder: (context, state) {
+                    List<DropdownMenuItem<String>> items = [];
+                    if (state is POListLoaded) {
+                      items = state.orders
+                          .map(
+                            (po) => DropdownMenuItem(
+                              value: po.id,
+                              child: Text(
+                                '${po.poNumber} (${po.status})',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList();
+                    }
+
+                    return DropdownButtonFormField<String>(
+                      key: const Key('invoice_po_dropdown'),
+                      initialValue: _selectedPoId,
+                      items: items,
+                      onChanged: (val) => setState(() => _selectedPoId = val),
+                      decoration: const InputDecoration(
+                        labelText: 'Purchase Order',
+                        prefixIcon: Icon(Icons.shopping_cart),
+                        helperText: 'Select the PO for this invoice',
+                      ),
+                      validator: (v) => v == null ? 'Required' : null,
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
+
+                // ── Invoice Number ──
                 TextFormField(
+                  key: const Key('invoice_number_input'),
                   controller: _numberCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Invoice Number',
@@ -75,6 +115,8 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
                   validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
+
+                // ── Date Picker ──
                 TextFormField(
                   readOnly: true,
                   decoration: InputDecoration(
@@ -101,20 +143,89 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
                   validator: (_) => _date == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
+
+                // ── Amount ──
                 TextFormField(
+                  key: const Key('invoice_amount_input'),
                   controller: _amountCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Total Amount (₹)',
                     prefixIcon: Icon(Icons.currency_rupee),
                   ),
-                  validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Required';
+                    if (double.tryParse(v) == null) return 'Invalid amount';
+                    return null;
+                  },
                 ),
+                const SizedBox(height: 16),
+
+                // ── File Selection ──
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Invoice PDF',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedFile?.name ?? 'No file selected',
+                              style: TextStyle(
+                                color: _selectedFile != null
+                                    ? Colors.black87
+                                    : Colors.grey,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _pickFile,
+                            icon: const Icon(Icons.attach_file),
+                            label: const Text('Select'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (_selectedFile == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, left: 12),
+                    child: Text(
+                      'Required',
+                      style: TextStyle(
+                        color: AppColors.destructive,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 32),
+
+                // ── Submit Button ──
                 BlocBuilder<InvoiceBloc, InvoiceState>(
                   builder: (context, state) {
                     final loading = state is InvoiceLoading;
                     return ElevatedButton.icon(
+                      key: const Key('invoice_submit_button'),
                       onPressed: loading ? null : _submit,
                       icon: loading
                           ? const SizedBox(
@@ -143,14 +254,25 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a PDF file'),
+          backgroundColor: AppColors.destructive,
+        ),
+      );
+      return;
+    }
+
     final amount = double.tryParse(_amountCtrl.text) ?? 0;
     context.read<InvoiceBloc>().add(
       UploadInvoice(
-        poId: _poIdCtrl.text.trim(),
+        poId: _selectedPoId!,
         invoiceNumber: _numberCtrl.text.trim(),
         invoiceDate:
             '${_date!.year}-${_date!.month.toString().padLeft(2, '0')}-${_date!.day.toString().padLeft(2, '0')}',
         totalCents: (amount * 100).toInt(),
+        filePath: _selectedFile!.path,
       ),
     );
   }

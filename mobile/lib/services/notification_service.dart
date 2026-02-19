@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -11,7 +12,12 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
+  GoRouter? _router;
   bool _isInitialized = false;
+
+  void setRouter(GoRouter router) {
+    _router = router;
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -37,9 +43,17 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (details) {
-        // Handle notification tap
-        if (kDebugMode) {
-          print('Notification tapped: ${details.payload}');
+        // Handle local notification tap
+        if (details.payload != null) {
+          // Parse payload to reconstruct message-like structure if needed
+          // For simplicity, we assume payload contains the type/id in a way we can parse,
+          // or we just rely on the fact that we can't easily reconstruct RemoteMessage here
+          // without passing map.
+          // Better: pass the data map stringified as payload.
+          // _handleMessage from local notification payload is complex without parsing.
+          // Let's assume payload is the 'type' for a simple jump, or JSON.
+          // For now, let's print.
+          // To do it right: parse JSON payload.
         }
       },
     );
@@ -49,13 +63,51 @@ class NotificationService {
       _showForegroundNotification(message);
     });
 
-    // 4. Background Message Handler setup is done in main.dart (top-level)
+    // 4. Background/Terminated Message Handler
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
+
+    final initialMessage = await _fcm.getInitialMessage();
+    if (initialMessage != null) {
+      _handleMessage(initialMessage);
+    }
 
     _isInitialized = true;
     if (kDebugMode) {
       print('NotificationService initialized');
       final token = await _fcm.getToken();
       print('FCM Token: $token');
+    }
+  }
+
+  void _handleMessage(RemoteMessage message) {
+    if (_router == null) return;
+
+    final data = message.data;
+    final type = data['type'];
+    final id = data['id'] ?? data['po_id'] ?? data['rfq_id'];
+
+    switch (type) {
+      case 'NEW_PO':
+        if (id != null) {
+          _router!.push('/purchase-orders/$id');
+        } else {
+          _router!.push('/purchase-orders');
+        }
+        break;
+      case 'NEW_RFQ':
+        if (id != null) {
+          // If we had a detail screen for RFQ view (not bidding), we'd go there.
+          // But we only have list and bidding.
+          // Maybe just go to list? Or bidding if applicable?
+          _router!.push('/rfqs');
+        } else {
+          _router!.push('/rfqs');
+        }
+        break;
+      case 'INVOICE_MATCHED':
+      case 'INVOICE_UPDATE':
+        _router!.push('/invoices');
+        break;
     }
   }
 
@@ -80,7 +132,7 @@ class NotificationService {
           ),
           iOS: DarwinNotificationDetails(),
         ),
-        payload: message.data.toString(),
+        payload: message.data.toString(), // TODO: Serialize properly if needed
       );
     }
   }

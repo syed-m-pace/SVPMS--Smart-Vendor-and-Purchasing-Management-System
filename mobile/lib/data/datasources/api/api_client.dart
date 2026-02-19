@@ -151,11 +151,24 @@ class ApiClient {
   }
 
   // ─── RFQs ─────────────────────────────────────────────
-  Future<Map<String, dynamic>> getRFQs({int page = 1, int size = 20}) async {
+  Future<Map<String, dynamic>> getRFQs({
+    String? status,
+    int page = 1,
+    int size = 20,
+  }) async {
     final resp = await dio.get(
       '/api/v1/rfqs',
-      queryParameters: {'page': page, 'size': size},
+      queryParameters: {
+        'page': page,
+        'size': size,
+        if (status != null) 'status': status,
+      },
     );
+    return resp.data;
+  }
+
+  Future<Map<String, dynamic>> getRFQ(String id) async {
+    final resp = await dio.get('/api/v1/rfqs/$id');
     return resp.data;
   }
 
@@ -204,8 +217,8 @@ class ApiClient {
   }
 
   // ─── Vendors ──────────────────────────────────────────
-  Future<Map<String, dynamic>> getVendorProfile() async {
-    final resp = await dio.get('/api/v1/vendors');
+  Future<Map<String, dynamic>> getVendorMe() async {
+    final resp = await dio.get('/api/v1/vendors/me');
     return resp.data;
   }
 

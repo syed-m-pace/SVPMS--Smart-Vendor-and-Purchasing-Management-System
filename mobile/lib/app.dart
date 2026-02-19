@@ -7,6 +7,7 @@ import 'data/repositories/auth_repository.dart';
 import 'data/repositories/dashboard_repository.dart';
 import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/po_repository.dart';
+import 'data/repositories/rfq_repository.dart';
 import 'presentation/auth/bloc/auth_bloc.dart';
 import 'presentation/dashboard/bloc/dashboard_bloc.dart';
 import 'presentation/invoices/bloc/invoice_bloc.dart';
@@ -17,24 +18,30 @@ import 'services/storage_service.dart';
 
 class SVPMSApp extends StatelessWidget {
   final LocalCacheService localCache;
+  final StorageService? storageService;
+  final AuthRepository? authRepository;
 
-  const SVPMSApp({super.key, required this.localCache});
+  const SVPMSApp({
+    super.key,
+    required this.localCache,
+    this.storageService,
+    this.authRepository,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final storage = StorageService();
+    final storage = storageService ?? StorageService();
     final apiClient = ApiClient(storage: storage);
 
-    final authRepo = AuthRepository(
-      api: apiClient,
-      storage: storage,
-      cache: localCache,
-    );
+    final authRepo =
+        authRepository ??
+        AuthRepository(api: apiClient, storage: storage, cache: localCache);
     final dashboardRepo = DashboardRepository(
       api: apiClient,
       cache: localCache,
     );
     final poRepo = PORepository(api: apiClient, cache: localCache);
+    final rfqRepo = RFQRepository(api: apiClient, cache: localCache);
 
     final invoiceRepo = InvoiceRepository(
       api: apiClient,
@@ -51,6 +58,7 @@ class SVPMSApp extends StatelessWidget {
         RepositoryProvider<DashboardRepository>.value(value: dashboardRepo),
         RepositoryProvider<PORepository>.value(value: poRepo),
         RepositoryProvider<InvoiceRepository>.value(value: invoiceRepo),
+        RepositoryProvider<RFQRepository>.value(value: rfqRepo),
         RepositoryProvider<LocalCacheService>.value(value: localCache),
       ],
       child: MultiBlocProvider(
@@ -64,7 +72,7 @@ class SVPMSApp extends StatelessWidget {
           BlocProvider(
             create: (_) => InvoiceBloc(repo: invoiceRepo)..add(LoadInvoices()),
           ),
-          BlocProvider(create: (_) => RFQBloc(api: apiClient)..add(LoadRFQs())),
+          BlocProvider(create: (_) => RFQBloc(repo: rfqRepo)..add(LoadRFQs())),
         ],
         child: MaterialApp.router(
           title: 'SVPMS Vendor Portal',

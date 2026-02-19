@@ -126,6 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Email
                           TextField(
+                            key: const Key('login_email_input'),
                             controller: _emailCtrl,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
@@ -138,6 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Password
                           TextField(
+                            key: const Key('login_password_input'),
                             controller: _passwordCtrl,
                             obscureText: _obscure,
                             decoration: InputDecoration(
@@ -161,6 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             builder: (context, state) {
                               final loading = state is AuthLoading;
                               return ElevatedButton(
+                                key: const Key('login_submit_button'),
                                 onPressed: loading ? null : _login,
                                 child: loading
                                     ? const SizedBox(

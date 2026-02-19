@@ -7,10 +7,13 @@ import '../../presentation/dashboard/screens/dashboard_screen.dart';
 import '../../presentation/purchase_orders/screens/po_list_screen.dart';
 import '../../presentation/purchase_orders/screens/po_detail_screen.dart';
 import '../../presentation/rfqs/screens/rfq_list_screen.dart';
+import '../../presentation/rfqs/screens/rfq_bidding_screen.dart';
 import '../../presentation/invoices/screens/invoice_list_screen.dart';
 import '../../presentation/invoices/screens/invoice_upload_screen.dart';
 import '../../presentation/profile/screens/profile_screen.dart';
 import 'app_shell.dart';
+
+import '../../services/notification_service.dart';
 
 /// Bridges AuthBloc state changes → GoRouter.refresh so the redirect runs
 /// whenever auth state changes (login, logout).
@@ -23,7 +26,7 @@ class AuthNotifier extends ChangeNotifier {
 GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
   final authNotifier = AuthNotifier(authBloc);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/dashboard',
     refreshListenable: authNotifier,
     redirect: (context, state) async {
@@ -54,6 +57,13 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
           GoRoute(
             path: '/rfqs',
             builder: (context, state) => const RFQListScreen(),
+            routes: [
+              GoRoute(
+                path: ':id/bid',
+                builder: (context, state) =>
+                    RFQBiddingScreen(rfqId: state.pathParameters['id']!),
+              ),
+            ],
           ),
           GoRoute(
             path: '/invoices',
@@ -71,4 +81,7 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
       ),
     ],
   );
+
+  NotificationService().setRouter(router);
+  return router;
 }

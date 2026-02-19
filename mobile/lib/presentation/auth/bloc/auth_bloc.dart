@@ -77,7 +77,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final user = await _repo.login(event.email, event.password);
-      emit(Authenticated(user));
+      if (user.role != 'vendor') {
+        await _repo.logout();
+        emit(AuthError('Access denied: Vendor portal only'));
+      } else {
+        emit(Authenticated(user));
+      }
     } catch (e) {
       final msg = e.toString().contains('DioException')
           ? 'Invalid email or password'

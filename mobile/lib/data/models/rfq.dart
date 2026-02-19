@@ -2,6 +2,7 @@ class RFQ {
   final String id;
   final String rfqNumber;
   final String title;
+  final String? description;
   final String status;
   final String? deadline;
   final String? createdAt;
@@ -12,6 +13,7 @@ class RFQ {
     required this.id,
     required this.rfqNumber,
     required this.title,
+    this.description,
     required this.status,
     this.deadline,
     this.createdAt,
@@ -24,6 +26,7 @@ class RFQ {
       id: json['id'] ?? '',
       rfqNumber: json['rfq_number'] ?? json['rfqNumber'] ?? '',
       title: json['title'] ?? '',
+      description: json['description'],
       status: json['status'] ?? '',
       deadline: json['deadline'],
       createdAt: json['created_at'],

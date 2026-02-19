@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'services/local_cache_service.dart';
 import 'services/notification_service.dart';
+import 'core/observers/crashlytics_bloc_observer.dart';
 import 'app.dart';
 import 'firebase_options.dart';
 
@@ -30,6 +32,9 @@ void main() async {
   // 4. Initialize Notifications (FCM)
   await NotificationService().initialize();
 
-  // 5. Run App
+  // 5. Bloc Observer
+  Bloc.observer = CrashlyticsBlocObserver();
+
+  // 6. Run App
   runApp(SVPMSApp(localCache: localCache));
 }
