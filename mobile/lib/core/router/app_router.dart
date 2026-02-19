@@ -69,15 +69,16 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
             path: '/invoices',
             builder: (context, state) => const InvoiceListScreen(),
           ),
-          GoRoute(
-            path: '/invoices/upload',
-            builder: (context, state) => const InvoiceUploadScreen(),
-          ),
+
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/invoices/upload',
+        builder: (context, state) => const InvoiceUploadScreen(),
       ),
     ],
   );

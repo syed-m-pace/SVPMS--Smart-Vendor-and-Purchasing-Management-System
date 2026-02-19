@@ -32,7 +32,7 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
     );
     if (result != null) {
       setState(() => _selectedFile = result.files.first);
@@ -96,7 +96,7 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Purchase Order',
                         prefixIcon: Icon(Icons.shopping_cart),
-                        helperText: 'Select the PO for this invoice',
+                        helperText: 'Select the PO for this invoice *',
                       ),
                       validator: (v) => v == null ? 'Required' : null,
                     );
@@ -175,7 +175,7 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Invoice PDF',
+                        'Invoice Document',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -210,7 +210,7 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
                   const Padding(
                     padding: EdgeInsets.only(top: 4, left: 12),
                     child: Text(
-                      'Required',
+                      'Required *',
                       style: TextStyle(
                         color: AppColors.destructive,
                         fontSize: 12,
@@ -257,7 +257,7 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
     if (_selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select a PDF file'),
+          content: Text('Please select a document'),
           backgroundColor: AppColors.destructive,
         ),
       );

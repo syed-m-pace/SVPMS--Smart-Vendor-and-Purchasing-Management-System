@@ -21,12 +21,20 @@ class InvoiceRepository {
     required int totalCents,
     String? filePath,
   }) async {
-    final data = await _api.uploadInvoice(
+    String? documentUrl;
+    if (filePath != null) {
+      final fileData = await _api.uploadFile(filePath);
+      // We store the presigned URL or key. Using presigned_url for immediate access/OCR.
+      // Ideally, the backend would take the key, but we fit the 'document_url' field.
+      documentUrl = fileData['presigned_url'];
+    }
+
+    final data = await _api.createInvoice(
       poId: poId,
       invoiceNumber: invoiceNumber,
       invoiceDate: invoiceDate,
       totalCents: totalCents,
-      filePath: filePath,
+      documentUrl: documentUrl,
     );
     return Invoice.fromJson(data);
   }

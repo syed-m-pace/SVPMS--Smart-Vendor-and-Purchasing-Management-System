@@ -83,6 +83,36 @@ async def get_vendor(
         raise HTTPException(status_code=404, detail="Vendor not found")
     return _to_response(vendor)
 
+    return _to_response(vendor)
+
+
+@router.get("/me", response_model=VendorResponse)
+async def get_vendor_me(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """Get the vendor profile for the current tenant."""
+    # Assuming one vendor record per tenant for vendor users
+    # Or find by tenant_id?
+    # In this system, it seems Tenant = Vendor for vendor users.
+    # We look for a Vendor record that matches the tenant_id?
+    # Actually, the Vendor table HAS a tenant_id column.
+    # So we select * from vendors where tenant_id = current_user['tenant_id']
+    # But get_db_with_tenant ALREADY filters by tenant_id if we use the session correctly?
+    # No, get_db_with_tenant sets search path or similar.
+    # Let's just query Vendor.
+    # Since we are in the tenant context, we just need to find the vendor record.
+    # If there are multiple, return the first?
+    result = await db.execute(select(Vendor).where(Vendor.deleted_at == None))
+    vendor = result.scalar_one_or_none()
+    
+    if not vendor:
+        # If no vendor record found (maybe admin user of tenant?), handle gracefully?
+        # For a vendor user, this should exist.
+        raise HTTPException(status_code=404, detail="Vendor profile not found")
+        
+    return _to_response(vendor)
+
 
 @router.post("", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
 async def create_vendor(

@@ -82,6 +82,7 @@ class MockAuthRepository extends Mock implements AuthRepository {
           firstName: 'Admin',
           lastName: 'User',
           role: 'admin',
+          isActive: true,
         ),
       );
     }
@@ -93,6 +94,7 @@ class MockAuthRepository extends Mock implements AuthRepository {
           firstName: 'Vendor',
           lastName: 'User',
           role: 'vendor',
+          isActive: true,
         ),
       );
     }

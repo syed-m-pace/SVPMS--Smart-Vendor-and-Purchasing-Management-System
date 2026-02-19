@@ -14,6 +14,7 @@ from api.schemas.auth import (
     RefreshTokenRequest,
     RegisterRequest,
     UserResponse,
+    ChangePasswordRequest,
 )
 from api.services.auth_service import (
     hash_password,
@@ -28,6 +29,34 @@ from api.middleware.auth import get_current_user
 logger = structlog.get_logger()
 
 router = APIRouter()
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the authenticated user's password."""
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"], User.is_active == True)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password",
+        )
+
+    user.password_hash = hash_password(body.new_password)
+    await db.commit()
+
+    logger.info("password_changed", user_id=str(user.id))
+
 
 
 @router.post("/login", response_model=TokenResponse)

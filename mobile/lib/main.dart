@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -30,7 +32,9 @@ void main() async {
   await localCache.init();
 
   // 4. Initialize Notifications (FCM)
-  await NotificationService().initialize();
+  if (Platform.isAndroid) {
+    await NotificationService().initialize();
+  }
 
   // 5. Bloc Observer
   Bloc.observer = CrashlyticsBlocObserver();

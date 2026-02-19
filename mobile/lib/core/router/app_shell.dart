@@ -55,18 +55,31 @@ class AppShell extends StatelessWidget {
         appBar: AppBar(
           title: Text(_title(index)),
           actions: [
-            if (index == 3) // invoices tab
+            if (index == 0) // dashboard tab
               IconButton(
-                icon: const Icon(Icons.upload),
-                tooltip: 'Upload Invoice',
-                onPressed: () => context.push('/invoices/upload'),
+                icon: const Icon(Icons.notifications),
+                tooltip: 'Notifications',
+                onPressed: () {
+                  // Placeholder for notifications
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No new notifications')),
+                  );
+                },
               ),
           ],
         ),
         body: child,
+        floatingActionButton: index == 3
+            ? FloatingActionButton(
+                onPressed: () => context.push('/invoices/upload'),
+                tooltip: 'Upload Invoice',
+                child: const Icon(Icons.upload),
+              )
+            : null,
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: index,
           onTap: (i) => context.go(_tabs[i]),
+          type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard),

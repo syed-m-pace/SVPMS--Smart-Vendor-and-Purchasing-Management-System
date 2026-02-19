@@ -18,6 +18,19 @@ VALID_ROLES = (
     "vendor",
 )
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not PASSWORD_REGEX.match(v):
+            raise ValueError(
+                "Password must contain: uppercase, lowercase, number, and special character (@$!%*?&)"
+            )
+        return v
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -62,6 +75,7 @@ class UserResponse(BaseModel):
     last_name: Optional[str] = None
     role: str
     department_id: Optional[str] = None
+    profile_photo_url: Optional[str] = None
     is_active: bool
 
     model_config = {"from_attributes": True}

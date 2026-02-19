@@ -21,6 +21,24 @@ class LoginRequested extends AuthEvent {
 
 class LogoutRequested extends AuthEvent {}
 
+class UpdateProfileRequested extends AuthEvent {
+  final Map<String, dynamic> data;
+  UpdateProfileRequested(this.data);
+  @override
+  List<Object?> get props => [data];
+}
+
+class ChangePasswordRequested extends AuthEvent {
+  final String currentPassword;
+  final String newPassword;
+  ChangePasswordRequested({
+    required this.currentPassword,
+    required this.newPassword,
+  });
+  @override
+  List<Object?> get props => [currentPassword, newPassword];
+}
+
 // ─── States ──────────────────────────────────────────────
 abstract class AuthState extends Equatable {
   @override
@@ -56,7 +74,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       super(AuthInitial()) {
     on<CheckAuth>(_onCheckAuth);
     on<LoginRequested>(_onLogin);
+
     on<LogoutRequested>(_onLogout);
+    on<UpdateProfileRequested>(_onUpdateProfile);
+    on<ChangePasswordRequested>(_onChangePassword);
   }
 
   Future<void> _onCheckAuth(CheckAuth event, Emitter<AuthState> emit) async {
@@ -77,7 +98,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final user = await _repo.login(event.email, event.password);
-      if (user.role != 'vendor') {
+      if (user.role.toLowerCase() != 'vendor') {
         await _repo.logout();
         emit(AuthError('Access denied: Vendor portal only'));
       } else {
@@ -86,7 +107,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       final msg = e.toString().contains('DioException')
           ? 'Invalid email or password'
-          : e.toString();
+          : e.toString().replaceAll('Exception: ', '');
       emit(AuthError(msg));
     }
   }
@@ -94,5 +115,43 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLogout(LogoutRequested event, Emitter<AuthState> emit) async {
     await _repo.logout();
     emit(Unauthenticated());
+  }
+
+  Future<void> _onUpdateProfile(
+    UpdateProfileRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is Authenticated) {
+      try {
+        final updatedUser = await _repo.updateProfile(event.data);
+        emit(Authenticated(updatedUser));
+      } catch (e) {
+        // For now, emit error. UI should handle success/failure feedback via Repository if possible,
+        // or listen to this state.
+        emit(AuthError('Failed to update profile: $e'));
+        // Re-emit authenticated state to restore UI after error
+        emit(Authenticated(currentState.user));
+      }
+    }
+  }
+
+  Future<void> _onChangePassword(
+    ChangePasswordRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! Authenticated) return;
+
+    try {
+      await _repo.changePassword(event.currentPassword, event.newPassword);
+      // Optional: emit success event or relying on UI optimism?
+      // Since password change doesn't alter User object (immediately visible),
+      // we just stay Authenticated.
+    } catch (e) {
+      emit(AuthError('Failed to change password: $e'));
+      // Restore state
+      emit(Authenticated(currentState.user));
+    }
   }
 }

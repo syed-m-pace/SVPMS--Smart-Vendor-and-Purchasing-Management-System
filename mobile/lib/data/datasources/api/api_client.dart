@@ -73,11 +73,6 @@ class ApiClient {
     return resp.data;
   }
 
-  Future<Map<String, dynamic>> getMe() async {
-    final resp = await dio.get('/auth/me');
-    return resp.data;
-  }
-
   // ─── Dashboard (aggregated from POs + Invoices) ───────
   /// No dedicated dashboard endpoint exists — we aggregate from other APIs
   Future<Map<String, dynamic>> getDashboard() async {
@@ -197,29 +192,61 @@ class ApiClient {
     return resp.data;
   }
 
-  Future<Map<String, dynamic>> uploadInvoice({
+  Future<Map<String, dynamic>> createInvoice({
     required String poId,
     required String invoiceNumber,
-    required String invoiceDate,
+    required String invoiceDate, // YYYY-MM-DD
     required int totalCents,
-    String? filePath,
+    String? documentUrl,
   }) async {
-    final data = FormData.fromMap({
+    final data = Map<String, dynamic>.from({
       'po_id': poId,
       'invoice_number': invoiceNumber,
       'invoice_date': invoiceDate,
       'total_cents': totalCents,
-      if (filePath != null)
-        'file': await MultipartFile.fromFile(filePath, filename: 'invoice.pdf'),
+      if (documentUrl != null) 'document_url': documentUrl,
     });
     final resp = await dio.post('/api/v1/invoices', data: data);
     return resp.data;
   }
 
-  // ─── Vendors ──────────────────────────────────────────
+  // ─── Files ────────────────────────────────────────────
+  Future<Map<String, dynamic>> uploadFile(String filePath) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath),
+    });
+    final resp = await dio.post('/api/v1/files/upload', data: formData);
+    return resp.data;
+  }
+
+  // ─── Vendors / Users ──────────────────────────────────
   Future<Map<String, dynamic>> getVendorMe() async {
     final resp = await dio.get('/api/v1/vendors/me');
     return resp.data;
+  }
+
+  Future<Map<String, dynamic>> getMe() async {
+    final resp = await dio.get(
+      '/api/v1/users/me',
+    ); // Changed to users/me as per UserResponse schema
+    return resp.data;
+  }
+
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    final me = await getMe();
+    final userId = me['id'];
+    final resp = await dio.put('/api/v1/users/$userId', data: data);
+    return resp.data;
+  }
+
+  Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    await dio.post(
+      '/api/v1/auth/change-password',
+      data: {'current_password': currentPassword, 'new_password': newPassword},
+    );
   }
 
   // ─── FCM ──────────────────────────────────────────────

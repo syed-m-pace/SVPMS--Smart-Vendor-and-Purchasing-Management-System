@@ -3,8 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/datasources/api/api_client.dart';
-import '../../../data/models/vendor.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../auth/bloc/auth_bloc.dart';
+import '../../../data/models/vendor.dart';
 import '../../widgets/status_badge.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -25,15 +26,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<Vendor> _fetchVendor() async {
     final client = context.read<ApiClient>();
-    final data = await client.getMe();
-    return Vendor.fromJson(data);
+    final vendor = await client.getVendorMe();
+    return Vendor.fromJson(vendor);
+  }
+
+  Future<void> _pickImage() async {
+    final client = context.read<ApiClient>();
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null && result.files.single.path != null) {
+      final filePath = result.files.single.path!;
+      try {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Uploading image...')));
+        final uploadResp = await client.uploadFile(filePath);
+        final key = uploadResp['file_key']; // Store key
+
+        // Update profile
+        if (mounted) {
+          context.read<AuthBloc>().add(
+            UpdateProfileRequested({'profile_photo_url': key}),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Upload failed: $e'),
+              backgroundColor: AppColors.destructive,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showChangePasswordDialog() {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Change Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentCtrl,
+              decoration: const InputDecoration(labelText: 'Current Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newCtrl,
+              decoration: const InputDecoration(labelText: 'New Password'),
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthBloc>().add(
+                ChangePasswordRequested(
+                  currentPassword: currentCtrl.text,
+                  newPassword: newCtrl.text,
+                ),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Request processed')),
+              );
+            },
+            child: const Text('Change'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<AuthBloc, AuthState>(
       listener: (context, state) {
-        // If logged out, GoRouter redirect will handle navigation
+        if (state is AuthError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.destructive,
+            ),
+          );
+        }
       },
       builder: (context, state) {
         return Scaffold(
@@ -80,33 +168,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 20),
                     // ── Avatar ──
                     Center(
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, AppColors.accent],
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.card, // surface -> card
+                              border: Border.all(color: AppColors.border),
+                              image: user?.profilePhotoUrl != null
+                                  ? DecorationImage(
+                                      image: NetworkImage(
+                                        user!.profilePhotoUrl!,
+                                      ),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                            child: user?.profilePhotoUrl == null
+                                ? Center(
+                                    child: Text(
+                                      vendor?.legalName.isNotEmpty == true
+                                          ? vendor!.legalName[0].toUpperCase()
+                                          : '?',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                           ),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Center(
-                          child: Text(
-                            vendor?.legalName
-                                    .split(' ')
-                                    .map((w) => w.isNotEmpty ? w[0] : '')
-                                    .take(2)
-                                    .join()
-                                    .toUpperCase() ??
-                                '?',
-                            style: GoogleFonts.inter(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: _pickImage,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
+
                     const SizedBox(height: 16),
                     Center(
                       child: Text(
@@ -167,6 +284,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Column(
                         children: [
                           _tile(
+                            Icons.lock_outline,
+                            'Change Password',
+                            onTap: _showChangePasswordDialog,
+                          ),
+                          const Divider(height: 1),
+                          _tile(
                             Icons.info_outline,
                             'About SVPMS',
                             subtitle: 'v1.0.0',
@@ -205,13 +328,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _tile(IconData icon, String title, {String? subtitle}) {
+  Widget _tile(
+    IconData icon,
+    String title, {
+    String? subtitle,
+    VoidCallback? onTap,
+  }) {
     return ListTile(
       leading: Icon(icon, color: AppColors.primary),
       title: Text(title),
       subtitle: subtitle != null
           ? Text(subtitle, style: const TextStyle(fontWeight: FontWeight.w500))
           : null,
+      onTap: onTap,
+      trailing: onTap != null ? const Icon(Icons.chevron_right) : null,
     );
   }
 }

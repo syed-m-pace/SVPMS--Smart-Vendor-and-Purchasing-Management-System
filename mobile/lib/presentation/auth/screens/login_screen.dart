@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 'eng.manager@acme.com');
+  final _emailCtrl = TextEditingController(text: 'vendor@alphasupplies.com');
   final _passwordCtrl = TextEditingController(text: 'SvpmsTest123!');
   bool _obscure = true;
 
@@ -206,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'eng.manager@acme.com',
+                            'vendor@alphasupplies.com',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               color: Colors.white,

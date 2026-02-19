@@ -41,6 +41,20 @@ class AuthRepository {
     }
   }
 
+  Future<User> updateProfile(Map<String, dynamic> data) async {
+    final responseData = await _api.updateProfile(data);
+    // The API returns the updated user object. Update cache.
+    await _cache.cacheUser(responseData);
+    return User.fromJson(responseData);
+  }
+
+  Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    await _api.changePassword(currentPassword, newPassword);
+  }
+
   Future<void> logout() async {
     await _storage.clearTokens();
     await _cache.clearCache();

@@ -9,16 +9,27 @@ from api.middleware.authorization import require_roles
 from api.models.user import User
 from api.schemas.auth import UserResponse, UserCreateRequest
 from api.schemas.common import PaginatedResponse, build_pagination
+from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.auth_service import hash_password
+from api.services.storage import r2_client
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 def _to_response(u: User) -> UserResponse:
+    profile_photo_url = u.profile_photo_url
+    if profile_photo_url and not profile_photo_url.startswith("http"):
+        # Assume it's a key, generate signed URL
+        try:
+            profile_photo_url = r2_client.get_presigned_url(profile_photo_url)
+        except Exception:
+            pass  # Keep original or None if failed
+
     return UserResponse(
         id=str(u.id), email=u.email, first_name=u.first_name, last_name=u.last_name,
         role=u.role, department_id=str(u.department_id) if u.department_id else None,
+        profile_photo_url=profile_photo_url,
         is_active=u.is_active,
     )
 
@@ -99,7 +110,7 @@ async def update_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    allowed = {"first_name", "last_name", "role", "department_id", "is_active"}
+    allowed = {"first_name", "last_name", "role", "department_id", "is_active", "profile_photo_url"}
     for k, v in body.items():
         if k in allowed:
             setattr(user, k, v)

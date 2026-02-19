@@ -28,6 +28,7 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    profile_photo_url: Mapped[Optional[str]] = mapped_column(Text)
     fcm_token: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow
