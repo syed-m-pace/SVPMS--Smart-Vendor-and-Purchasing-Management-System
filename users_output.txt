@@ -1,0 +1,43 @@
+Checking users...
+User: finance.head@acme.com, Role: finance_head, Active: True, Deleted: None
+User: cfo@acme.com, Role: cfo, Active: True, Deleted: None
+User: procurement@acme.com, Role: procurement, Active: True, Deleted: None
+User: mkt.manager@acme.com, Role: manager, Active: True, Deleted: None
+User: proc.lead@acme.com, Role: procurement_lead, Active: True, Deleted: None
+User: ops.manager@acme.com, Role: manager, Active: True, Deleted: None
+User: finance@acme.com, Role: finance, Active: True, Deleted: None
+User: admin@acme.com, Role: admin, Active: True, Deleted: None
+User: vendor@alphasupplies.com, Role: vendor, Active: True, Deleted: None
+User: eng.manager@acme.com, Role: manager, Active: True, Deleted: None
+
+Checking vendors...
+Vendor: Alpha Supplies Inc., Email: sales@alphasupplies.com, Status: ACTIVE
+Vendor: Delta Electronics, Email: sales@deltaelec.com, Status: BLOCKED
+Vendor: Beta Hardware Ltd., Email: contact@betahw.com, Status: BLOCKED
+Vendor: Test Critical Supplier, Email: supplier@test.com, Status: DRAFT
+Vendor: Test Supplier dcfc35d0, Email: supplier_dcfc35d0@test.com, Status: DRAFT
+Vendor: Tenant A Vendor 699a9b97, Email: vendor_699a9b97@tenanta.com, Status: DRAFT
+Vendor: Test Supplier 3ae0ab5d, Email: supplier_3ae0ab5d@test.com, Status: DRAFT
+Vendor: Tenant A Vendor af04c77c, Email: vendor_af04c77c@tenanta.com, Status: DRAFT
+Vendor: Test Supplier 07552067, Email: supplier_07552067@test.com, Status: DRAFT
+Vendor: Tenant A Vendor 6a64682a, Email: vendor_6a64682a@tenanta.com, Status: DRAFT
+Vendor: Test Supplier 7f277315, Email: supplier_7f277315@test.com, Status: DRAFT
+Vendor: Tenant A Vendor 2092985e, Email: vendor_2092985e@tenanta.com, Status: DRAFT
+Vendor: Test Supplier 1c399b16, Email: supplier_1c399b16@test.com, Status: DRAFT
+Vendor: Tenant A Vendor bf030e49, Email: vendor_bf030e49@tenanta.com, Status: DRAFT
+Vendor: Test Supplier ab0daa98, Email: supplier_ab0daa98@test.com, Status: DRAFT
+Vendor: Test Supplier 7ca2b9ec, Email: supplier_7ca2b9ec@test.com, Status: DRAFT
+Vendor: Test Supplier 259343c0, Email: supplier_259343c0@test.com, Status: DRAFT
+Vendor: Test Supplier c29cf981, Email: supplier_c29cf981@test.com, Status: DRAFT
+Vendor: Tenant A Vendor 7ad93863, Email: vendor_7ad93863@tenanta.com, Status: DRAFT
+Vendor: Omega Consulting, Email: hello@omegaconsult.com, Status: DRAFT
+Vendor: Test Supplier 28836415, Email: supplier_28836415@test.com, Status: ACTIVE
+Vendor: E2E Test Vendor 1771409354, Email: e2e-1771409354@test.com, Status: BLOCKED
+Vendor: Gamma Services Co., Email: info@gammaservices.com, Status: ACTIVE
+Vendor: Testing My Name, Email: syedmuheeb2001@gmail.com, Status: ACTIVE
+Vendor: Test Supplier 3aacb5ee, Email: supplier_3aacb5ee@test.com, Status: DRAFT
+Vendor: Tenant A Vendor 268843b5, Email: vendor_268843b5@tenanta.com, Status: DRAFT
+Vendor: Test Supplier 02d72c0f, Email: supplier_02d72c0f@test.com, Status: DRAFT
+Vendor: Test Supplier e7989d04, Email: supplier_e7989d04@test.com, Status: DRAFT
+Vendor: Test Supplier 95357fda, Email: supplier_95357fda@test.com, Status: DRAFT
+Vendor: Backend Validation Vendor 1771495895, Email: val.1771495895@test.com, Status: ACTIVE

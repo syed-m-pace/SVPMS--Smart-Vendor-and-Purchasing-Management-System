@@ -140,20 +140,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
                 if (snapshot.hasError) {
                   return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Failed to load profile'),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _vendorFuture = _fetchVendor();
-                          }),
-                          child: const Text('Retry'),
-                        ),
-                        const SizedBox(height: 24),
-                        // Fallback logout
-                        _logoutButton(context),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.destructive.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.person_off_outlined,
+                              size: 48,
+                              color: AppColors.destructive,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Failed to load profile',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Something went wrong while fetching your profile data. Please try again.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => setState(() {
+                                _vendorFuture = _fetchVendor();
+                              }),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text('Retry'),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                context.read<AuthBloc>().add(LogoutRequested());
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: AppColors.destructive),
+                                foregroundColor: AppColors.destructive,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text('Sign Out'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }
