@@ -60,3 +60,4 @@ keys/*.pem
 # Logs
 logs/
 *.log
+env.yaml
