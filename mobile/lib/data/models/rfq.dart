@@ -8,6 +8,7 @@ class RFQ {
   final String? createdAt;
   final int? budgetCents;
   final List<RFQLineItem> lineItems;
+  final List<RFQBid> bids;
 
   const RFQ({
     required this.id,
@@ -19,6 +20,7 @@ class RFQ {
     this.createdAt,
     this.budgetCents,
     this.lineItems = const [],
+    this.bids = const [],
   });
 
   factory RFQ.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,11 @@ class RFQ {
       lineItems:
           (json['line_items'] as List<dynamic>?)
               ?.map((e) => RFQLineItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      bids:
+          (json['bids'] as List<dynamic>?)
+              ?.map((e) => RFQBid.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
     );
@@ -59,6 +66,32 @@ class RFQLineItem {
       description: json['description'] ?? '',
       quantity: (json['quantity'] ?? 0).toDouble(),
       unit: json['unit'],
+    );
+  }
+}
+
+class RFQBid {
+  final String id;
+  final String vendorId;
+  final int totalCents;
+  final int? deliveryDays;
+  final String? notes;
+
+  const RFQBid({
+    required this.id,
+    required this.vendorId,
+    required this.totalCents,
+    this.deliveryDays,
+    this.notes,
+  });
+
+  factory RFQBid.fromJson(Map<String, dynamic> json) {
+    return RFQBid(
+      id: json['id'] ?? '',
+      vendorId: json['vendor_id'] ?? '',
+      totalCents: json['total_cents'] ?? 0,
+      deliveryDays: json['delivery_days'],
+      notes: json['notes'],
     );
   }
 }

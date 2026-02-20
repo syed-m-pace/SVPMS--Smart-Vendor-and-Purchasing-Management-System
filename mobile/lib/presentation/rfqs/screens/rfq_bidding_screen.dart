@@ -57,6 +57,15 @@ class _RFQBiddingScreenState extends State<RFQBiddingScreen> {
                 ),
               );
             }
+            if (state is RFQDetailLoaded) {
+              final rfq = state.rfq;
+              if (rfq.bids.isNotEmpty && _priceCtrl.text.isEmpty) {
+                final myBid = rfq.bids.first;
+                _priceCtrl.text = (myBid.totalCents / 100).toStringAsFixed(0);
+                _leadTimeCtrl.text = myBid.deliveryDays?.toString() ?? '';
+                _commentsCtrl.text = myBid.notes ?? '';
+              }
+            }
           },
           builder: (context, state) {
             if (state is RFQLoading) {
@@ -248,7 +257,11 @@ class _RFQBiddingScreenState extends State<RFQBiddingScreen> {
                                   vertical: 16,
                                 ),
                               ),
-                              child: const Text('Submit Bid'),
+                              child: Text(
+                                rfq.bids.isNotEmpty
+                                    ? 'Update Bid'
+                                    : 'Submit Bid',
+                              ),
                             ),
                           ),
                         ],

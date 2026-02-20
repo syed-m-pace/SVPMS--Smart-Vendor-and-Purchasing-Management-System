@@ -56,13 +56,25 @@ def _bid_to_response(b: RfqBid) -> RfqBidResponse:
     )
 
 
-async def _build_response(db: AsyncSession, rfq: Rfq) -> RfqResponse:
+async def _build_response(db: AsyncSession, rfq: Rfq, current_user: dict = None) -> RfqResponse:
     lines_result = await db.execute(
         select(RfqLineItem).where(RfqLineItem.rfq_id == rfq.id)
     )
-    bids_result = await db.execute(
-        select(RfqBid).where(RfqBid.rfq_id == rfq.id).order_by(RfqBid.total_cents)
-    )
+    
+    bids_query = select(RfqBid).where(RfqBid.rfq_id == rfq.id).order_by(RfqBid.total_cents)
+    
+    if current_user and current_user.get("role") == "vendor":
+        from api.models.vendor import Vendor
+        vendor_result = await db.execute(
+            select(Vendor).where(Vendor.email == current_user["email"])
+        )
+        vendor = vendor_result.scalar_one_or_none()
+        if vendor:
+            bids_query = bids_query.where(RfqBid.vendor_id == str(vendor.id))
+        else:
+            bids_query = bids_query.where(RfqBid.vendor_id == "00000000-0000-0000-0000-000000000000")
+            
+    bids_result = await db.execute(bids_query)
     return RfqResponse(
         id=str(rfq.id),
         tenant_id=str(rfq.tenant_id),
@@ -101,7 +113,7 @@ async def list_rfqs(
 
     items = []
     for rfq in rfqs:
-        items.append(await _build_response(db, rfq))
+        items.append(await _build_response(db, rfq, current_user))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -116,7 +128,7 @@ async def get_rfq(
     rfq = result.scalar_one_or_none()
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
-    return await _build_response(db, rfq)
+    return await _build_response(db, rfq, current_user)
 
 
 @router.post("", response_model=RfqResponse, status_code=status.HTTP_201_CREATED)
@@ -282,11 +294,15 @@ async def submit_bid(
             RfqBid.vendor_id == vendor_id,
         )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="You have already submitted a bid for this RFQ",
-        )
+    existing_bid = existing.scalar_one_or_none()
+    if existing_bid:
+        existing_bid.total_cents = body.total_cents
+        existing_bid.delivery_days = body.delivery_days
+        existing_bid.notes = body.notes
+        bid = existing_bid
+        await db.flush()
+        logger.info("rfq_bid_updated", rfq_id=rfq_id, vendor_id=vendor_id)
+        return _bid_to_response(bid)
 
     bid = RfqBid(
         tenant_id=current_user["tenant_id"],

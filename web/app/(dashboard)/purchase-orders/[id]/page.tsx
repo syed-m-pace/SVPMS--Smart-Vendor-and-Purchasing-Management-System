@@ -32,7 +32,8 @@ export default function PODetailPage() {
                     <div className="flex items-center gap-3"><h1 className="text-2xl font-bold font-mono">{po.po_number}</h1><StatusBadge status={po.status} /></div>
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Vendor</p><p className="text-lg font-medium">{po.vendor_name || po.vendor_id.substring(0, 8)}</p></CardContent></Card>
                 <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Total</p><p className="text-2xl font-bold font-mono">{formatCurrency(po.total_cents)}</p></CardContent></Card>
                 <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Created</p><p className="text-lg font-medium">{formatDate(po.created_at)}</p></CardContent></Card>
                 <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Issued</p><p className="text-lg font-medium">{po.issued_at ? formatDate(po.issued_at) : "Not issued"}</p></CardContent></Card>
