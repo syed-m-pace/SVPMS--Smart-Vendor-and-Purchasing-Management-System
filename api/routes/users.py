@@ -135,9 +135,11 @@ async def update_user(
     user_id: str,
     body: dict,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
+    if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this user")
+
     result = await db.execute(select(User).where(User.id == user_id, User.deleted_at == None))  # noqa: E711
     user = result.scalar_one_or_none()
     if not user:
@@ -146,11 +148,11 @@ async def update_user(
     allowed = {
         "first_name",
         "last_name",
-        "role",
-        "department_id",
-        "is_active",
         "profile_photo_url",
     }
+    if current_user["role"] == "admin":
+        allowed.update({"role", "department_id", "is_active"})
+
     for k, v in body.items():
         if k in allowed:
             setattr(user, k, v)

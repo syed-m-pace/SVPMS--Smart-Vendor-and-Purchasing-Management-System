@@ -26,6 +26,8 @@ export default function VendorDetailPage() {
     const [blockOpen, setBlockOpen] = useState(false);
     const [blockReason, setBlockReason] = useState("");
     const [processing, setProcessing] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+    const [editForm, setEditForm] = useState<any>({});
 
     useEffect(() => {
         vendorService.get(params.id as string).then(setVendor).catch(() => toast.error("Failed to load vendor")).finally(() => setLoading(false));
@@ -61,8 +63,6 @@ export default function VendorDetailPage() {
         } catch { toast.error("Failed"); } finally { setProcessing(false); }
     }
 
-    const [editOpen, setEditOpen] = useState(false);
-    const [editForm, setEditForm] = useState<any>({});
 
     function openEdit() {
         setEditForm({
