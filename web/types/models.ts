@@ -115,12 +115,16 @@ export interface PurchaseOrder {
     po_number: string;
     pr_id: string | null;
     vendor_id: string;
+    vendor_name?: string | null;
     status: POStatus;
     total_cents: number;
     currency: string;
     issued_at: string | null;
+    expected_delivery_date?: string | null;
+    terms_and_conditions?: string | null;
     line_items: POLineItem[];
     created_at: string;
+    updated_at: string;
     vendor?: Vendor;
 }
 

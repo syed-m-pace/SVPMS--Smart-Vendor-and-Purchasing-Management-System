@@ -14,7 +14,10 @@ class PORepository {
   Future<List<PurchaseOrder>> list({String? status, int page = 1}) async {
     try {
       final data = await _api.getPurchaseOrders(status: status, page: page);
-      final items = data['data'] as List<dynamic>? ?? data['items'] as List<dynamic>? ?? [];
+      final items =
+          data['data'] as List<dynamic>? ??
+          data['items'] as List<dynamic>? ??
+          [];
       // Cache the list if it's the first page
       if (page == 1 && status == null) {
         await _cache.cachePOs(items);
@@ -58,8 +61,11 @@ class PORepository {
     }
   }
 
-  Future<PurchaseOrder> acknowledge(String id) async {
-    final data = await _api.acknowledgePO(id);
+  Future<PurchaseOrder> acknowledge(
+    String id,
+    String expectedDeliveryDate,
+  ) async {
+    final data = await _api.acknowledgePO(id, expectedDeliveryDate);
     return PurchaseOrder.fromJson(data);
   }
 }

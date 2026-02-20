@@ -13,6 +13,10 @@ class PoLineItemResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AcknowledgeRequest(BaseModel):
+    expected_delivery_date: Optional[str] = None
+
+
 class PurchaseOrderCreate(BaseModel):
     pr_id: str
     vendor_id: str
@@ -26,6 +30,7 @@ class PurchaseOrderResponse(BaseModel):
     po_number: str
     pr_id: Optional[str] = None
     vendor_id: str
+    vendor_name: Optional[str] = None
     status: str
     total_cents: int
     currency: str

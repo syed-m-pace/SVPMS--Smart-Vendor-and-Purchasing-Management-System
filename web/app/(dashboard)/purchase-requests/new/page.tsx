@@ -98,7 +98,7 @@ export default function NewPurchaseRequestPage() {
                                             <option value="">Select department</option>
                                             {departments.map((d) => (
                                                 <option key={d.id} value={d.id}>
-                                                    {d.name} ({d.code})
+                                                    {d.name} {d.code ? `(${d.code})` : ""}
                                                 </option>
                                             ))}
                                         </select>

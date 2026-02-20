@@ -152,27 +152,95 @@ class PODetailScreen extends StatelessWidget {
   }
 
   void _ack(BuildContext context, String id) async {
-    final confirmed = await showDialog<bool>(
+    String? selectedDateStr;
+    final confirmedDate = await showDialog<String?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Acknowledge PO'),
-        content: const Text(
-          'Are you sure you want to acknowledge this purchase order?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Acknowledge'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Acknowledge PO'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Please add the expected delivery date to acknowledge this purchase order.',
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Expected Delivery Date:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final dt = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 1000),
+                        ),
+                      );
+                      if (dt != null) {
+                        setState(() {
+                          // Format to YYYY-MM-DD
+                          selectedDateStr =
+                              '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            selectedDateStr ?? 'Select date...',
+                            style: TextStyle(
+                              color: selectedDateStr == null
+                                  ? Colors.grey.shade600
+                                  : Colors.black,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.calendar_today,
+                            size: 20,
+                            color: Colors.grey,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, null),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedDateStr == null
+                      ? null
+                      : () => Navigator.pop(ctx, selectedDateStr),
+                  child: const Text('Acknowledge'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
-    if (confirmed == true && context.mounted) {
-      context.read<POBloc>().add(AcknowledgePO(id));
+    if (confirmedDate != null && context.mounted) {
+      context.read<POBloc>().add(AcknowledgePO(id, confirmedDate));
     }
   }
 }

@@ -164,8 +164,14 @@ class ApiClient {
     return resp.data;
   }
 
-  Future<Map<String, dynamic>> acknowledgePO(String id) async {
-    final resp = await dio.post('/api/v1/purchase-orders/$id/acknowledge');
+  Future<Map<String, dynamic>> acknowledgePO(
+    String id,
+    String expectedDeliveryDate,
+  ) async {
+    final resp = await dio.post(
+      '/api/v1/purchase-orders/$id/acknowledge',
+      data: {'expected_delivery_date': expectedDeliveryDate},
+    );
     return resp.data;
   }
 

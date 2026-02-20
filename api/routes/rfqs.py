@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -10,6 +10,9 @@ from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
 from api.models.rfq import Rfq, RfqLineItem, RfqBid
 from api.models.vendor import Vendor
+from api.models.user import User
+from api.services.notification_service import send_notification
+from api.services.push_service import send_push
 from api.schemas.rfq import (
     RfqCreate,
     RfqResponse,
@@ -119,6 +122,7 @@ async def get_rfq(
 @router.post("", response_model=RfqResponse, status_code=status.HTTP_201_CREATED)
 async def create_rfq(
     body: RfqCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -157,6 +161,54 @@ async def create_rfq(
 
     await db.flush()
     logger.info("rfq_created", rfq_id=str(rfq.id), rfq_number=rfq.rfq_number)
+
+    # Notify all active vendors in the tenant
+    vendor_result = await db.execute(
+        select(Vendor).where(
+            Vendor.tenant_id == current_user["tenant_id"],
+            Vendor.status == "ACTIVE",
+            Vendor.deleted_at == None
+        )
+    )
+    vendors = vendor_result.scalars().all()
+    
+    for vendor in vendors:
+        try:
+            vendor_user_ids_result = await db.execute(
+                select(User.id).where(
+                    User.email == vendor.email,
+                    User.role == "vendor",
+                    User.is_active == True,
+                    User.deleted_at == None,
+                )
+            )
+            vendor_user_ids = [str(row[0]) for row in vendor_user_ids_result.all()]
+            if vendor_user_ids:
+                await send_push(
+                    db,
+                    user_ids=vendor_user_ids,
+                    title="New Request for Quotation",
+                    body=f"A new RFQ ({rfq.rfq_number}) has been issued.",
+                    data={
+                        "type": "NEW_RFQ",
+                        "id": str(rfq.id),
+                        "rfq_id": str(rfq.id),
+                        "rfq_number": rfq.rfq_number,
+                    },
+                )
+            
+            background_tasks.add_task(
+                send_notification,
+                "notification", # fallback template if rfq_issued doesn't exist
+                [vendor.email],
+                {
+                    "title": rfq.title,
+                    "body": f"A new Request for Quotation ({rfq.rfq_number}) has been issued. Deadline: {rfq.deadline}",
+                },
+            )
+        except Exception as exc:
+            logger.error("rfq_vendor_notification_failed", rfq_id=str(rfq.id), vendor_id=str(vendor.id), error=str(exc))
+
     return await _build_response(db, rfq)
 
 

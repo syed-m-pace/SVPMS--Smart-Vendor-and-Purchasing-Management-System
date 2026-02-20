@@ -25,9 +25,10 @@ class LoadPODetail extends POEvent {
 
 class AcknowledgePO extends POEvent {
   final String id;
-  AcknowledgePO(this.id);
+  final String expectedDeliveryDate;
+  AcknowledgePO(this.id, this.expectedDeliveryDate);
   @override
-  List<Object?> get props => [id];
+  List<Object?> get props => [id, expectedDeliveryDate];
 }
 
 // ─── States ──────────────────────────────────────────────
@@ -103,7 +104,7 @@ class POBloc extends Bloc<POEvent, POState> {
     Emitter<POState> emit,
   ) async {
     try {
-      final po = await _repo.acknowledge(event.id);
+      final po = await _repo.acknowledge(event.id, event.expectedDeliveryDate);
       emit(POAcknowledged(po));
     } catch (e) {
       emit(POError(e.toString()));

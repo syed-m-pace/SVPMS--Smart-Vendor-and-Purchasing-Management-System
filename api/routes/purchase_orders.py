@@ -19,6 +19,7 @@ from api.schemas.purchase_order import (
     PurchaseOrderResponse,
     PoLineItemResponse,
     CancelRequest,
+    AcknowledgeRequest,
 )
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.budget_service import release_budget_reservation
@@ -49,13 +50,14 @@ def _line_to_response(li: PoLineItem) -> PoLineItemResponse:
     )
 
 
-def _to_response(po: PurchaseOrder, line_items: list[PoLineItem]) -> PurchaseOrderResponse:
+def _to_response(po: PurchaseOrder, line_items: list[PoLineItem], vendor_name: Optional[str] = None) -> PurchaseOrderResponse:
     return PurchaseOrderResponse(
         id=str(po.id),
         tenant_id=str(po.tenant_id),
         po_number=po.po_number,
         pr_id=str(po.pr_id) if po.pr_id else None,
         vendor_id=str(po.vendor_id),
+        vendor_name=vendor_name,
         status=po.status,
         total_cents=po.total_cents,
         currency=po.currency,
@@ -146,15 +148,17 @@ async def list_purchase_orders(
         count_q = count_q.where(PurchaseOrder.pr_id == pr_id)
 
     total = (await db.execute(count_q)).scalar() or 0
+    q = q.add_columns(Vendor.legal_name).join(Vendor, PurchaseOrder.vendor_id == Vendor.id)
     result = await db.execute(
         q.order_by(PurchaseOrder.created_at.desc()).offset((page - 1) * limit).limit(limit)
     )
-    pos = result.scalars().all()
+    rows = result.all()
 
     items = []
-    for po in pos:
+    for row in rows:
+        po, vendor_name = row[0], row[1]
         line_items = await _get_line_items(db, po.id)
-        items.append(_to_response(po, line_items))
+        items.append(_to_response(po, line_items, vendor_name=vendor_name))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -217,13 +221,15 @@ async def get_purchase_order(
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(
-        select(PurchaseOrder).where(
+        select(PurchaseOrder, Vendor.legal_name).join(Vendor, PurchaseOrder.vendor_id == Vendor.id).where(
             PurchaseOrder.id == po_id, PurchaseOrder.deleted_at == None  # noqa: E711
         )
     )
-    po = result.scalar_one_or_none()
-    if not po:
+    row = result.first()
+    if not row:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    po, vendor_name = row
 
     if current_user["role"] == "vendor":
         vendor = await _resolve_vendor_for_user(db, current_user)
@@ -231,7 +237,7 @@ async def get_purchase_order(
             raise HTTPException(status_code=404, detail="Purchase order not found")
 
     line_items = await _get_line_items(db, po.id)
-    return _to_response(po, line_items)
+    return _to_response(po, line_items, vendor_name=vendor_name)
 
 
 @router.post("", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED)
@@ -377,12 +383,13 @@ async def create_purchase_order(
         )
 
     logger.info("po_created", po_id=str(po.id), po_number=po.po_number, pr_id=str(pr.id))
-    return _to_response(po, line_items)
+    return _to_response(po, line_items, vendor_name=vendor.legal_name)
 
 
 @router.post("/{po_id}/acknowledge", response_model=PurchaseOrderResponse)
 async def acknowledge_purchase_order(
     po_id: str,
+    body: AcknowledgeRequest,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("vendor")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -407,10 +414,16 @@ async def acknowledge_purchase_order(
             detail="Can only acknowledge purchase orders in ISSUED status",
         )
 
+    if body.expected_delivery_date:
+        try:
+            po.expected_delivery_date = datetime.fromisoformat(body.expected_delivery_date)
+        except ValueError:
+            pass # Invalid format, ignore or handle elsewhere
+
     po.status = "ACKNOWLEDGED"
     await db.flush()
     line_items = await _get_line_items(db, po.id)
-    return _to_response(po, line_items)
+    return _to_response(po, line_items, vendor_name=vendor.legal_name)
 
 
 @router.post("/{po_id}/cancel", response_model=PurchaseOrderResponse)
@@ -422,13 +435,15 @@ async def cancel_purchase_order(
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(
-        select(PurchaseOrder).where(
+        select(PurchaseOrder, Vendor.legal_name).join(Vendor, PurchaseOrder.vendor_id == Vendor.id).where(
             PurchaseOrder.id == po_id, PurchaseOrder.deleted_at == None  # noqa: E711
         )
     )
-    po = result.scalar_one_or_none()
-    if not po:
+    row = result.first()
+    if not row:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+    po, vendor_name = row
 
     if po.status in ("FULFILLED", "CLOSED", "CANCELLED"):
         raise HTTPException(
@@ -459,4 +474,4 @@ async def cancel_purchase_order(
     await db.flush()
     line_items = await _get_line_items(db, po.id)
     logger.info("po_cancelled", po_id=str(po.id), reason=body.reason, by=current_user["user_id"])
-    return _to_response(po, line_items)
+    return _to_response(po, line_items, vendor_name=vendor_name)
