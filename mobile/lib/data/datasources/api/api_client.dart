@@ -94,12 +94,29 @@ class ApiClient {
       final invoiceItems = invoiceData['data'] ?? invoiceData['items'] ?? [];
       final rfqItems = rfqData['data'] ?? rfqData['items'] ?? [];
 
-      final poTotal = poData['pagination']?['total'] ?? poData['total'] ?? (poItems as List?)?.length ?? 0;
-      final invoiceTotal = invoiceData['pagination']?['total'] ?? invoiceData['total'] ?? (invoiceItems as List?)?.length ?? 0;
-      final rfqTotal = rfqData['pagination']?['total'] ?? rfqData['total'] ?? (rfqItems as List?)?.length ?? 0;
+      final poTotal =
+          poData['pagination']?['total'] ??
+          poData['total'] ??
+          (poItems as List?)?.length ??
+          0;
+      final invoiceTotal =
+          invoiceData['pagination']?['total'] ??
+          invoiceData['total'] ??
+          (invoiceItems as List?)?.length ??
+          0;
+      final rfqTotal =
+          rfqData['pagination']?['total'] ??
+          rfqData['total'] ??
+          (rfqItems as List?)?.length ??
+          0;
 
       return {
+        'active_pos': poTotal,
+        'open_invoices': invoiceTotal,
+        'pending_rfqs': rfqTotal,
+        'pending_prs': 0,
         'stats': {
+          // Kept for backwards compatibility if needed
           'total_pos': poTotal,
           'total_invoices': invoiceTotal,
           'total_rfqs': rfqTotal,
@@ -110,6 +127,10 @@ class ApiClient {
     } catch (e) {
       // Fallback if any endpoint fails
       return {
+        'active_pos': 0,
+        'open_invoices': 0,
+        'pending_rfqs': 0,
+        'pending_prs': 0,
         'stats': {
           'total_pos': 0,
           'total_invoices': 0,
@@ -252,9 +273,9 @@ class ApiClient {
 
   // ─── FCM ──────────────────────────────────────────────
   Future<void> updateFCMToken(String token, String deviceType) async {
-    await dio.post('/api/v1/users/me/devices', data: {
-      'fcm_token': token,
-      'device_type': deviceType,
-    });
+    await dio.post(
+      '/api/v1/users/me/devices',
+      data: {'fcm_token': token, 'device_type': deviceType},
+    );
   }
 }

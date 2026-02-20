@@ -1,12 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:svpms_vendor/data/datasources/api/api_client.dart';
+import 'package:svpms_vendor/data/models/vendor.dart';
+import 'package:svpms_vendor/presentation/widgets/status_badge.dart';
 import '../../presentation/auth/bloc/auth_bloc.dart';
 
 /// Shell widget containing bottom navigation bar and app bar
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  late Future<Vendor> _vendorFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _vendorFuture = _fetchVendor();
+  }
+
+  Future<Vendor> _fetchVendor() async {
+    final client = context.read<ApiClient>();
+    final vendor = await client.getVendorMe();
+    return Vendor.fromJson(vendor);
+  }
 
   static const _tabs = [
     '/dashboard',
@@ -66,9 +88,23 @@ class AppShell extends StatelessWidget {
                   );
                 },
               ),
+            FutureBuilder<Vendor>(
+              future: _vendorFuture,
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data?.status != null) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 16.0),
+                    child: Center(
+                      child: StatusBadge(status: snapshot.data!.status),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
           ],
         ),
-        body: child,
+        body: widget.child,
         floatingActionButton: index == 3
             ? FloatingActionButton(
                 onPressed: () => context.push('/invoices/upload'),

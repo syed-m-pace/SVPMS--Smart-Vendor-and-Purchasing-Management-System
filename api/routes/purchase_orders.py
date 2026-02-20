@@ -239,7 +239,7 @@ async def create_purchase_order(
     body: PurchaseOrderCreate,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
+    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager", "finance", "finance_head", "cfo")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     # Validate PR exists and is APPROVED

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/purchase_order.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -55,31 +56,27 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    StatCard(
-                      title: 'Pending PRs',
-                      value: state.stats.pendingPRs.toString(),
-                      icon: Icons.description,
-                      color: AppColors.warning,
-                    ),
                     StatCard(
                       title: 'Active POs',
                       value: state.stats.activePOs.toString(),
                       icon: Icons.shopping_cart,
                       color: AppColors.success,
+                      onTap: () => context.go('/purchase-orders'),
                     ),
                     StatCard(
                       title: 'Pending RFQs',
                       value: state.stats.pendingRFQs.toString(),
                       icon: Icons.attach_money,
                       color: AppColors.accent,
+                      onTap: () => context.go('/rfqs'),
                     ),
                     StatCard(
                       title: 'Open Invoices',
                       value: state.stats.openInvoices.toString(),
                       icon: Icons.receipt_long,
                       color: AppColors.info,
+                      onTap: () => context.go('/invoices'),
                     ),
                   ],
                 ),

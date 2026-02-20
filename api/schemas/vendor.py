@@ -18,6 +18,7 @@ class VendorUpdate(BaseModel):
     phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
     bank_name: Optional[str] = None
     ifsc_code: Optional[str] = None
+    bank_account_number: Optional[str] = Field(None, min_length=8, max_length=34)
 
 
 class VendorResponse(BaseModel):

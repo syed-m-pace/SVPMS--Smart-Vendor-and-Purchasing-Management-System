@@ -301,9 +301,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (vendor?.status != null)
-                      Center(child: StatusBadge(status: vendor!.status)),
-                    const SizedBox(height: 12),
                     Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(

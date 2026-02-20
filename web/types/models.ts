@@ -44,6 +44,10 @@ export interface Vendor {
     status: VendorStatus;
     risk_score: number;
     rating: number;
+    bank_name?: string | null;
+    ifsc_code?: string | null;
+    bank_account?: string | null;
+    contact_person?: string | null;
     created_at: string;
 }
 

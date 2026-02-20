@@ -15,7 +15,7 @@ export const vendorService = {
         return data;
     },
     update: async (id: string, body: Partial<Vendor>) => {
-        const { data } = await api.put<Vendor>(`/vendors/${id}`, body);
+        const { data } = await api.patch<Vendor>(`/vendors/${id}`, body);
         return data;
     },
     approve: async (id: string) => {

@@ -250,12 +250,12 @@ async def create_vendor(
     return _to_response(vendor)
 
 
-@router.put("/{vendor_id}", response_model=VendorResponse)
+@router.patch("/{vendor_id}", response_model=VendorResponse)
 async def update_vendor(
     vendor_id: str,
     body: VendorUpdate,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("procurement_lead", "admin")),
+    _auth: None = Depends(require_roles("procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(
@@ -266,7 +266,10 @@ async def update_vendor(
         raise HTTPException(status_code=404, detail="Vendor not found")
 
     for field, val in body.model_dump(exclude_unset=True).items():
-        setattr(vendor, field, val)
+        if field == "bank_account_number":
+            vendor.bank_account_number_encrypted = val
+        else:
+            setattr(vendor, field, val)
 
     await db.flush()
     return _to_response(vendor)

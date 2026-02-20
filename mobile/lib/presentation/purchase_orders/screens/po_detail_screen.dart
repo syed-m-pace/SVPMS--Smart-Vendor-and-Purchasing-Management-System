@@ -71,6 +71,7 @@ class PODetailScreen extends StatelessWidget {
                             ],
                           ),
                           const Divider(height: 24),
+                          _row('Issued to', po.vendorName ?? 'Vendor'),
                           _row('Issued', formatDate(po.issuedAt)),
                           _row(
                             'Expected Delivery',
