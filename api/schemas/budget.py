@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, Field
+from api.schemas.department import DepartmentResponse
 
 
 class BudgetCreate(BaseModel):
@@ -28,5 +29,6 @@ class BudgetResponse(BaseModel):
     status: str = "ACTIVE"
     created_at: str
     updated_at: str
+    department: Optional[DepartmentResponse] = None
 
     model_config = {"from_attributes": True}

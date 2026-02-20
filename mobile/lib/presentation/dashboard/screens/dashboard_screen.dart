@@ -56,6 +56,7 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     StatCard(
                       title: 'Active POs',
@@ -126,7 +127,7 @@ class _POCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        onTap: () => context.go('/purchase-orders/${po.id}'),
+        onTap: () => context.push('/purchase-orders/${po.id}'),
         title: Text(
           po.poNumber,
           style: const TextStyle(fontWeight: FontWeight.w600),

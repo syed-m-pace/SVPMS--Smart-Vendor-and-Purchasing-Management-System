@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 import structlog
 
 from api.middleware.auth import get_current_user
@@ -8,6 +9,7 @@ from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
 from api.models.budget import Budget
 from api.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse
+from api.schemas.department import DepartmentResponse
 from api.schemas.common import PaginatedResponse, build_pagination
 
 logger = structlog.get_logger()
@@ -15,6 +17,10 @@ router = APIRouter()
 
 
 def _to_response(b: Budget) -> BudgetResponse:
+    dept = None
+    if getattr(b, "department", None):
+        dept = DepartmentResponse.model_validate(b.department)
+
     return BudgetResponse(
         id=str(b.id),
         tenant_id=str(b.tenant_id),
@@ -29,6 +35,7 @@ def _to_response(b: Budget) -> BudgetResponse:
         status=getattr(b, 'status', None) or "ACTIVE",
         created_at=b.created_at.isoformat() if b.created_at else "",
         updated_at=b.updated_at.isoformat() if b.updated_at else "",
+        department=dept,
     )
 
 
@@ -42,7 +49,7 @@ async def list_budgets(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    q = select(Budget)
+    q = select(Budget).options(joinedload(Budget.department))
     count_q = select(func.count(Budget.id))
 
     if department_id:
@@ -76,7 +83,7 @@ async def get_budget(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    result = await db.execute(select(Budget).where(Budget.id == budget_id))
+    result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget_id))
     budget = result.scalar_one_or_none()
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
@@ -116,19 +123,21 @@ async def create_budget(
     db.add(budget)
     await db.flush()
     await db.commit()
-    await db.refresh(budget)
-    return _to_response(budget)
+    
+    result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget.id))
+    budget_with_dept = result.scalar_one()
+    return _to_response(budget_with_dept)
 
 
-@router.put("/{budget_id}", response_model=BudgetResponse)
+@router.patch("/{budget_id}", response_model=BudgetResponse)
 async def update_budget(
     budget_id: str,
     body: BudgetUpdate,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin")),
+    _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    result = await db.execute(select(Budget).where(Budget.id == budget_id))
+    result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget_id))
     budget = result.scalar_one_or_none()
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
@@ -142,5 +151,7 @@ async def update_budget(
         budget.total_cents = body.total_cents
 
     await db.commit()
-    await db.refresh(budget)
-    return _to_response(budget)
+    
+    result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget.id))
+    budget_with_dept = result.scalar_one()
+    return _to_response(budget_with_dept)

@@ -6,6 +6,10 @@ export const budgetService = {
         const { data } = await api.get<PaginatedResponse<Budget>>("/budgets", { params });
         return data;
     },
+    update: async (id: string, payload: Partial<Budget>) => {
+        const { data } = await api.patch<Budget>(`/budgets/${id}`, payload);
+        return data;
+    },
 };
 
 export const departmentService = {

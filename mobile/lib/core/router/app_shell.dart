@@ -112,26 +112,33 @@ class _AppShellState extends State<AppShell> {
                 child: const Icon(Icons.upload),
               )
             : null,
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: index,
-          onTap: (i) => context.go(_tabs[i]),
-          type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart),
-              label: 'Orders',
-            ),
-            BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'RFQs'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long),
-              label: 'Invoices',
-            ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          ],
+        bottomNavigationBar: MediaQuery.removePadding(
+          context: context,
+          removeBottom: true,
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            currentIndex: index,
+            onTap: (i) => context.go(_tabs[i]),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard),
+                label: 'Dashboard',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.shopping_cart),
+                label: 'Orders',
+              ),
+              BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'RFQs'),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.receipt_long),
+                label: 'Invoices',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );

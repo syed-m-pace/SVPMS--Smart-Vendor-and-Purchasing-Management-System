@@ -124,7 +124,7 @@ async def create_rfq(
     body: RfqCreate,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
+    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     # Parse deadline

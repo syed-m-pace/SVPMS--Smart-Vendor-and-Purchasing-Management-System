@@ -58,11 +58,6 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
             builder: (context, state) => const POListScreen(),
           ),
           GoRoute(
-            path: '/purchase-orders/:id',
-            builder: (context, state) =>
-                PODetailScreen(poId: state.pathParameters['id']!),
-          ),
-          GoRoute(
             path: '/rfqs',
             builder: (context, state) => const RFQListScreen(),
             routes: [
@@ -83,6 +78,11 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
             builder: (context, state) => const ProfileScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/purchase-orders/:id',
+        builder: (context, state) =>
+            PODetailScreen(poId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/invoices/upload',

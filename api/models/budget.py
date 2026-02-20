@@ -13,7 +13,7 @@ from sqlalchemy import (
     Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.database import Base
 
@@ -30,6 +30,7 @@ class Budget(Base):
     department_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("departments.id"), nullable=False
     )
+    department: Mapped["Department"] = relationship("Department")
     fiscal_year: Mapped[int] = mapped_column(Integer, nullable=False)
     quarter: Mapped[int] = mapped_column(Integer, nullable=False)
     total_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
