@@ -16,17 +16,19 @@ export function formatCurrency(cents: number): string {
 
 /** Format ISO date string to readable format */
 export function formatDate(date: string | Date): string {
+    const d = typeof date === "string" && !date.endsWith("Z") ? new Date(`${date}Z`) : new Date(date);
     return new Intl.DateTimeFormat("en-IN", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-    }).format(new Date(date));
+    }).format(d);
 }
 
 /** Format ISO date string to relative time */
 export function timeAgo(date: string | Date): string {
+    const d = typeof date === "string" && !date.endsWith("Z") ? new Date(`${date}Z`) : new Date(date);
     const seconds = Math.floor(
-        (Date.now() - new Date(date).getTime()) / 1000
+        (Date.now() - d.getTime()) / 1000
     );
     if (seconds < 60) return "just now";
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;

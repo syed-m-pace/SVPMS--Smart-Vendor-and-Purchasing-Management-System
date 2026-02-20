@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { PaginatedResponse, Budget, Department, Approval, Receipt } from "@/types/models";
+import type { PaginatedResponse, Budget, Department, Approval, Receipt, RFQ } from "@/types/models";
 
 export const budgetService = {
     list: async (params?: Record<string, any>) => {
@@ -47,6 +47,17 @@ export const receiptService = {
     },
     create: async (body: any) => {
         const { data } = await api.post<Receipt>("/receipts", body);
+        return data;
+    },
+};
+
+export const rfqService = {
+    list: async (params?: Record<string, any>) => {
+        const { data } = await api.get<PaginatedResponse<RFQ>>("/rfqs", { params });
+        return data;
+    },
+    get: async (id: string) => {
+        const { data } = await api.get<RFQ>(`/rfqs/${id}`);
         return data;
     },
 };

@@ -19,7 +19,16 @@ router = APIRouter()
 def _to_response(b: Budget) -> BudgetResponse:
     dept = None
     if getattr(b, "department", None):
-        dept = DepartmentResponse.model_validate(b.department)
+        d = b.department
+        dept = DepartmentResponse(
+            id=str(d.id),
+            tenant_id=str(d.tenant_id),
+            name=d.name,
+            code=d.code,
+            manager_id=str(d.manager_id) if d.manager_id else None,
+            parent_department_id=str(d.parent_department_id) if d.parent_department_id else None,
+            created_at=d.created_at.isoformat() if d.created_at else "",
+        )
 
     return BudgetResponse(
         id=str(b.id),

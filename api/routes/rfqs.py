@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
@@ -129,7 +129,9 @@ async def create_rfq(
 ):
     # Parse deadline
     try:
-        deadline = datetime.fromisoformat(body.deadline)
+        deadline = datetime.fromisoformat(body.deadline.replace('Z', '+00:00'))
+        if deadline.tzinfo is not None:
+            deadline = deadline.astimezone(timezone.utc).replace(tzinfo=None)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

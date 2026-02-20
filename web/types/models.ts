@@ -239,14 +239,35 @@ export interface Approval {
 
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export interface RFQLineItem {
+    id: string;
+    description: string;
+    quantity: number;
+    specifications?: string | null;
+}
+
+export interface RFQBid {
+    id: string;
+    rfq_id: string;
+    vendor_id: string;
+    total_cents: number;
+    delivery_days?: number | null;
+    notes?: string | null;
+    score?: number | null;
+    submitted_at: string;
+}
+
 export interface RFQ {
     id: string;
     tenant_id: string;
     rfq_number: string;
+    title: string;
     pr_id: string | null;
     status: string;
     deadline: string | null;
     created_at: string;
+    line_items?: RFQLineItem[];
+    bids?: RFQBid[];
 }
 
 /* ── API Response Wrappers ── */

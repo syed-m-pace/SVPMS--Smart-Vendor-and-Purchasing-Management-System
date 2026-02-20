@@ -9,5 +9,9 @@ export const rfqService = {
     create: async (body: { title: string; pr_id: string; deadline: string; line_items: any[] }) => {
         const { data } = await api.post<RFQ>("/rfqs", body);
         return data;
+    },
+    get: async (id: string) => {
+        const { data } = await api.get<RFQ>(`/rfqs/${id}`);
+        return data;
     }
 };

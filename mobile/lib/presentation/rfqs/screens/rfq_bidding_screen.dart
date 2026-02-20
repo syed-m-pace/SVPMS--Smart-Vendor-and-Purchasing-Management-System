@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/currency_formatter.dart';
+
 import '../../../core/utils/date_formatter.dart';
 import '../../widgets/status_badge.dart';
 import '../bloc/rfq_bloc.dart';
@@ -104,11 +104,65 @@ class _RFQBiddingScreenState extends State<RFQBiddingScreen> {
                             if (rfq.description != null) Text(rfq.description!),
                             const SizedBox(height: 16),
                             _row(
-                              'Budget',
-                              formatCurrency(rfq.budgetCents ?? 0),
+                              'Quantity',
+                              rfq.lineItems
+                                  .fold<double>(
+                                    0,
+                                    (sum, item) => sum + item.quantity,
+                                  )
+                                  .toStringAsFixed(0),
                             ),
                             if (rfq.deadline != null)
                               _row('Deadline', formatDate(rfq.deadline)),
+                            if (rfq.lineItems.isNotEmpty) ...[
+                              const Divider(height: 16),
+                              Theme(
+                                data: Theme.of(
+                                  context,
+                                ).copyWith(dividerColor: Colors.transparent),
+                                child: ExpansionTile(
+                                  tilePadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'View Line Items',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  children: rfq.lineItems.map((item) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 8.0,
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          SizedBox(
+                                            width: 40,
+                                            child: Text(
+                                              '${item.quantity.toStringAsFixed(0)}x',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              item.description,
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
