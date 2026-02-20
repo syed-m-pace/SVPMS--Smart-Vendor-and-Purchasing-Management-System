@@ -78,6 +78,23 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             },
         )
 
+    if user.role == "vendor":
+        from api.models.vendor import Vendor
+        vendor_result = await db.execute(
+            select(Vendor).where(Vendor.email == user.email, Vendor.deleted_at == None)
+        )
+        vendor = vendor_result.scalar_one_or_none()
+        if not vendor or vendor.status != "ACTIVE":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": {
+                        "code": "VENDOR_NOT_ACTIVE",
+                        "message": "Your vendor account is pending review or inactive.",
+                    }
+                },
+            )
+
     # Update last_login_at (naive UTC to match TIMESTAMP WITHOUT TIME ZONE column)
     user.last_login_at = datetime.utcnow()
     await db.commit()

@@ -35,6 +35,8 @@ class ApiClient {
               try {
                 final resp = await dio.fetch(opts);
                 return handler.resolve(resp);
+              } on DioException catch (e) {
+                return handler.next(e);
               } catch (e) {
                 return handler.next(error);
               }

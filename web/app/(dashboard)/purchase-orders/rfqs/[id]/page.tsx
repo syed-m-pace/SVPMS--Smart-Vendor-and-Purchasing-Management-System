@@ -53,12 +53,13 @@ export default function RfqDetailsPage() {
 
     const fetchVendors = async (vendorIds: string[]) => {
         try {
-            // we will fetch all vendors for simplicity unless list grows huge
-            const vResponse = await vendorService.list({ limit: 1000 });
+            const vendorPromises = vendorIds.map(id => vendorService.get(id));
+            const vendorResults = await Promise.allSettled(vendorPromises);
+
             const vendorMap: Record<string, Vendor> = {};
-            vResponse.data.forEach((v: Vendor) => {
-                if (vendorIds.includes(v.id)) {
-                    vendorMap[v.id] = v;
+            vendorResults.forEach((result) => {
+                if (result.status === 'fulfilled' && result.value) {
+                    vendorMap[result.value.id] = result.value;
                 }
             });
             setVendors(vendorMap);
@@ -229,8 +230,15 @@ export default function RfqDetailsPage() {
                                                     <CheckCircle className="h-4 w-4" />
                                                 </Button>
                                             ) : (
-                                                <div className="text-xs text-muted-foreground text-center bg-muted px-2 py-1 rounded w-full">
-                                                    Available after deadline
+                                                <div onClick={() => toast.error("Cannot proceed until deadline")} className="w-full cursor-not-allowed">
+                                                    <Button
+                                                        disabled
+                                                        className="w-full gap-2 shadow-md opacity-50 pointer-events-none"
+                                                        variant="default"
+                                                    >
+                                                        Award PO
+                                                        <CheckCircle className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>

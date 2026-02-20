@@ -14,13 +14,14 @@ class RFQRepository {
   Future<List<RFQ>> list({String? status, int page = 1}) async {
     try {
       final data = await _api.getRFQs(status: status, page: page);
-      final items = data['data'] as List<dynamic>? ?? data['items'] as List<dynamic>? ?? [];
+      final items =
+          data['data'] as List<dynamic>? ??
+          data['items'] as List<dynamic>? ??
+          [];
       if (page == 1 && status == null) {
         await _cache.cacheRFQs(items);
       }
-      return items
-          .map((e) => RFQ.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return items.map((e) => RFQ.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       if (e is DioException) {
         final cached = _cache.getCachedRFQs();
@@ -62,9 +63,9 @@ class RFQRepository {
     String? comments,
   }) async {
     await _api.submitBid(rfqId, {
-      'unit_price_cents': unitPriceCents,
-      'lead_time_days': leadTimeDays,
-      if (comments != null && comments.isNotEmpty) 'comments': comments,
+      'total_cents': unitPriceCents,
+      'delivery_days': leadTimeDays,
+      if (comments != null && comments.isNotEmpty) 'notes': comments,
     });
   }
 }

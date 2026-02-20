@@ -6,7 +6,6 @@ import '../../../data/datasources/api/api_client.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../../data/models/vendor.dart';
-import '../../widgets/status_badge.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -112,8 +111,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<AuthBloc, AuthState>(
+    return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
+        if (state is Authenticated) {
+          setState(() {
+            _vendorFuture = _fetchVendor();
+          });
+        }
         if (state is AuthError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -123,264 +127,272 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
       },
-      builder: (context, state) {
-        return Scaffold(
-          body: RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _vendorFuture = _fetchVendor();
-              });
-              await _vendorFuture;
-            },
-            child: FutureBuilder<Vendor>(
-              future: _vendorFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.destructive.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.person_off_outlined,
-                              size: 48,
-                              color: AppColors.destructive,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Failed to load profile',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Something went wrong while fetching your profile data. Please try again.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () => setState(() {
-                                _vendorFuture = _fetchVendor();
-                              }),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+      child: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, state) {
+          return Scaffold(
+            body: RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  _vendorFuture = _fetchVendor();
+                });
+                await _vendorFuture;
+              },
+              child: FutureBuilder<Vendor>(
+                future: _vendorFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppColors.destructive.withValues(
+                                  alpha: 0.1,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                                shape: BoxShape.circle,
                               ),
-                              child: const Text('Retry'),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                context.read<AuthBloc>().add(LogoutRequested());
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: AppColors.destructive),
-                                foregroundColor: AppColors.destructive,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                              child: Icon(
+                                Icons.person_off_outlined,
+                                size: 48,
+                                color: AppColors.destructive,
                               ),
-                              child: const Text('Sign Out'),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'Failed to load profile',
+                              style: GoogleFonts.inter(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Something went wrong while fetching your profile data. Please try again.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () => setState(() {
+                                  _vendorFuture = _fetchVendor();
+                                }),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('Retry'),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  context.read<AuthBloc>().add(
+                                    LogoutRequested(),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: AppColors.destructive,
+                                  ),
+                                  foregroundColor: AppColors.destructive,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('Sign Out'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                }
+                    );
+                  }
 
-                final vendor = snapshot.data;
-                // Use Auth user as fallback/supplement if needed, but vendor data is primary
-                final user = state is Authenticated ? state.user : null;
+                  final vendor = snapshot.data;
+                  // Use Auth user as fallback/supplement if needed, but vendor data is primary
+                  final user = state is Authenticated ? state.user : null;
 
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const SizedBox(height: 20),
-                    // ── Avatar ──
-                    Center(
-                      child: Stack(
-                        children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.card, // surface -> card
-                              border: Border.all(color: AppColors.border),
-                              image: user?.profilePhotoUrl != null
-                                  ? DecorationImage(
-                                      image: NetworkImage(
-                                        user!.profilePhotoUrl!,
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      const SizedBox(height: 20),
+                      // ── Avatar ──
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 96,
+                              height: 96,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.card, // surface -> card
+                                border: Border.all(color: AppColors.border),
+                                image: user?.profilePhotoUrl != null
+                                    ? DecorationImage(
+                                        image: NetworkImage(
+                                          user!.profilePhotoUrl!,
+                                        ),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
+                              ),
+                              child: user?.profilePhotoUrl == null
+                                  ? Center(
+                                      child: Text(
+                                        vendor?.legalName.isNotEmpty == true
+                                            ? vendor!.legalName[0].toUpperCase()
+                                            : '?',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primary,
+                                        ),
                                       ),
-                                      fit: BoxFit.cover,
                                     )
                                   : null,
                             ),
-                            child: user?.profilePhotoUrl == null
-                                ? Center(
-                                    child: Text(
-                                      vendor?.legalName.isNotEmpty == true
-                                          ? vendor!.legalName[0].toUpperCase()
-                                          : '?',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: InkWell(
-                              onTap: _pickImage,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  size: 16,
-                                  color: Colors.white,
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: InkWell(
+                                onTap: _pickImage,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 24),
-                    Center(
-                      child: Text(
-                        vendor?.legalName ?? 'Unknown Vendor',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border),
-                        ),
+                      const SizedBox(height: 24),
+                      Center(
                         child: Text(
-                          user?.email ?? vendor?.email ?? '',
+                          vendor?.legalName ?? 'Unknown Vendor',
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: AppColors.textMuted,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.5,
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // ── Vendor Details ──
-                    Card(
-                      child: Column(
-                        children: [
-                          _tile(
-                            Icons.person_outline,
-                            'Contact Person',
-                            subtitle: vendor?.contactPerson ?? 'N/A',
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                          const Divider(height: 1),
-                          _tile(
-                            Icons.receipt_long,
-                            'GST Number',
-                            subtitle: vendor?.gstNumber ?? 'N/A',
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
                           ),
-                          const Divider(height: 1),
-                          _tile(
-                            Icons.account_balance,
-                            'Bank Account',
-                            subtitle: vendor?.bankAccount != null
-                                ? '•••• ${vendor!.bankAccount!.substring(vendor.bankAccount!.length > 4 ? vendor.bankAccount!.length - 4 : 0)}'
-                                : 'Not Linked',
+                          child: Text(
+                            user?.email ?? vendor?.email ?? '',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 32),
 
-                    // ── App Info ──
-                    Card(
-                      child: Column(
-                        children: [
-                          _tile(
-                            Icons.lock_outline,
-                            'Change Password',
-                            onTap: _showChangePasswordDialog,
-                          ),
-                          const Divider(height: 1),
-                          _tile(
-                            Icons.info_outline,
-                            'About SVPMS',
-                            subtitle: 'v1.0.0',
-                          ),
-                        ],
+                      // ── Vendor Details ──
+                      Card(
+                        child: Column(
+                          children: [
+                            _tile(
+                              Icons.person_outline,
+                              'Contact Person',
+                              subtitle: vendor?.contactPerson ?? 'N/A',
+                            ),
+                            const Divider(height: 1),
+                            _tile(
+                              Icons.receipt_long,
+                              'GST Number',
+                              subtitle: vendor?.gstNumber ?? 'N/A',
+                            ),
+                            const Divider(height: 1),
+                            _tile(
+                              Icons.account_balance,
+                              'Bank Account',
+                              subtitle: vendor?.bankAccount != null
+                                  ? '•••• ${vendor!.bankAccount!.substring(vendor.bankAccount!.length > 4 ? vendor.bankAccount!.length - 4 : 0)}'
+                                  : 'Not Linked',
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
-                    // ── Logout ──
-                    _logoutButton(context),
-                  ],
-                );
-              },
+                      // ── App Info ──
+                      Card(
+                        child: Column(
+                          children: [
+                            _tile(
+                              Icons.lock_outline,
+                              'Change Password',
+                              onTap: _showChangePasswordDialog,
+                            ),
+                            const Divider(height: 1),
+                            _tile(
+                              Icons.info_outline,
+                              'About SVPMS',
+                              subtitle: 'v1.0.0',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ── Logout ──
+                      _logoutButton(context),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

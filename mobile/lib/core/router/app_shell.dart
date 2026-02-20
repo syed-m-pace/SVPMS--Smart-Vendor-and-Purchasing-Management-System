@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:svpms_vendor/core/constants/app_colors.dart';
 import 'package:svpms_vendor/data/datasources/api/api_client.dart';
 import 'package:svpms_vendor/data/models/vendor.dart';
 import 'package:svpms_vendor/presentation/widgets/status_badge.dart';
@@ -71,6 +72,10 @@ class _AppShellState extends State<AppShell> {
       listener: (context, state) {
         if (state is Unauthenticated) {
           context.go('/login');
+        } else if (state is Authenticated) {
+          setState(() {
+            _vendorFuture = _fetchVendor();
+          });
         }
       },
       child: Scaffold(
@@ -116,6 +121,8 @@ class _AppShellState extends State<AppShell> {
           context: context,
           removeBottom: true,
           child: BottomNavigationBar(
+            elevation: 0,
+            backgroundColor: AppColors.background,
             type: BottomNavigationBarType.fixed,
             currentIndex: index,
             onTap: (i) => context.go(_tabs[i]),

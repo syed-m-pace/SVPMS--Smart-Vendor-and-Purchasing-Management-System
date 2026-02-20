@@ -186,9 +186,9 @@ class _RFQBiddingScreenState extends State<RFQBiddingScreen> {
                             controller: _priceCtrl,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: 'Unit Price (₹)',
+                              labelText: 'Total Bid Amount (₹)',
                               prefixIcon: Icon(Icons.currency_rupee),
-                              helperText: 'Enter price per unit',
+                              helperText: 'Enter total bid amount',
                             ),
                             validator: (v) {
                               if (v == null || v.isEmpty) return 'Required';

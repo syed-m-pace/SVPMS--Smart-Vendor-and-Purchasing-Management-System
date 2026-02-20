@@ -15,7 +15,7 @@ class AppColors {
 
   // ── Semantic ──
   static const Color success = Color(0xFF22C55E);
-  static const Color warning = Color(0xFFF59E0B);
+  static const Color warning = Color.fromARGB(255, 244, 180, 69);
   static const Color destructive = Color(0xFFEF4444);
   static const Color info = Color(0xFF8B5CF6); // Violet
 
@@ -38,7 +38,7 @@ class AppColors {
   static Color statusColor(String status) {
     switch (status.toUpperCase()) {
       case 'DRAFT':
-        return textMuted;
+        return warning;
       case 'PENDING':
       case 'PENDING_APPROVAL':
         return warning;
