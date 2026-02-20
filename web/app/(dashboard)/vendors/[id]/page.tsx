@@ -27,7 +27,7 @@ export default function VendorDetailPage() {
     const [blockReason, setBlockReason] = useState("");
     const [processing, setProcessing] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
-    const [editForm, setEditForm] = useState<any>({});
+    const [editForm, setEditForm] = useState<Partial<Vendor> & { bank_account_number?: string }>({});
 
     useEffect(() => {
         vendorService.get(params.id as string).then(setVendor).catch(() => toast.error("Failed to load vendor")).finally(() => setLoading(false));
@@ -157,23 +157,23 @@ export default function VendorDetailPage() {
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
                             <Label>Legal Name</Label>
-                            <Input value={editForm.legal_name || ""} onChange={(e) => setEditForm((f: any) => ({ ...f, legal_name: e.target.value }))} />
+                            <Input value={editForm.legal_name || ""} onChange={(e) => setEditForm(f => ({ ...f, legal_name: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
                             <Label>Phone</Label>
-                            <Input value={editForm.phone || ""} onChange={(e) => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} />
+                            <Input value={editForm.phone || ""} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
                             <Label>Bank Name</Label>
-                            <Input value={editForm.bank_name || ""} onChange={(e) => setEditForm((f: any) => ({ ...f, bank_name: e.target.value }))} />
+                            <Input value={editForm.bank_name || ""} onChange={(e) => setEditForm(f => ({ ...f, bank_name: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
                             <Label>IFSC Code</Label>
-                            <Input value={editForm.ifsc_code || ""} onChange={(e) => setEditForm((f: any) => ({ ...f, ifsc_code: e.target.value }))} />
+                            <Input value={editForm.ifsc_code || ""} onChange={(e) => setEditForm(f => ({ ...f, ifsc_code: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
                             <Label>Bank Account Number</Label>
-                            <Input value={editForm.bank_account_number || ""} onChange={(e) => setEditForm((f: any) => ({ ...f, bank_account_number: e.target.value }))} />
+                            <Input value={editForm.bank_account_number || ""} onChange={(e) => setEditForm(f => ({ ...f, bank_account_number: e.target.value }))} />
                         </div>
                     </div>
                     <DialogFooter>
