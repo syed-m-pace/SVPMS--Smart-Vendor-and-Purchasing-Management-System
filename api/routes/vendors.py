@@ -42,6 +42,8 @@ def _to_response(v: Vendor) -> VendorResponse:
         rating=float(v.rating) if v.rating is not None else None,
         bank_name=v.bank_name,
         ifsc_code=v.ifsc_code,
+        bank_account=v.bank_account_number_encrypted, # Exposing for profile view
+        contact_person=v.phone, # Map phone as contact person for now
         created_at=v.created_at.isoformat() if v.created_at else "",
         updated_at=v.updated_at.isoformat() if v.updated_at else "",
     )

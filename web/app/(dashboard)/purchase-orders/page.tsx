@@ -62,20 +62,10 @@ export default function PurchaseOrdersPage() {
         try {
             const r = await vendorService.list({ page: 1, limit: 100, status: "ACTIVE" });
             setVendors(r.data);
-            if (r.data.length > 0) {
-                const firstVendor = r.data[0].id;
-                setVendorByPr((prev) => {
-                    const next = { ...prev };
-                    readyItems.forEach((item) => {
-                        if (!next[item.pr_id]) next[item.pr_id] = firstVendor;
-                    });
-                    return next;
-                });
-            }
         } catch {
             toast.error("Failed to load active vendors");
         }
-    }, [readyItems]);
+    }, []);
 
     useEffect(() => {
         void loadPOs();

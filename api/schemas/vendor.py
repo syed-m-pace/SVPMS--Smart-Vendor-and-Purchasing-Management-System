@@ -32,6 +32,8 @@ class VendorResponse(BaseModel):
     rating: Optional[float] = None
     bank_name: Optional[str] = None
     ifsc_code: Optional[str] = None
+    bank_account: Optional[str] = None
+    contact_person: Optional[str] = None
     created_at: str
     updated_at: str
 

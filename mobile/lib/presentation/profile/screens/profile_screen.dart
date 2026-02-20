@@ -287,28 +287,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     Center(
                       child: Text(
                         vendor?.legalName ?? 'Unknown Vendor',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
+                          letterSpacing: -0.5,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     if (vendor?.status != null)
                       Center(child: StatusBadge(status: vendor!.status)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Center(
-                      child: Text(
-                        user?.email ?? vendor?.email ?? '',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textMuted,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          user?.email ?? vendor?.email ?? '',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),

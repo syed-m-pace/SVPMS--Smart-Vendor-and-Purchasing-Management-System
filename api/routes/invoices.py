@@ -80,10 +80,24 @@ async def list_invoices(
     q = select(Invoice)
     count_q = select(func.count(Invoice.id))
 
+    scoped_vendor_id = None
+    if current_user["role"] == "vendor":
+        from api.routes.purchase_orders import _resolve_vendor_for_user
+        vendor = await _resolve_vendor_for_user(db, current_user)
+        if not vendor:
+            return PaginatedResponse(
+                data=[],
+                pagination=build_pagination(page, limit, 0),
+            )
+        scoped_vendor_id = vendor.id
+
     if inv_status:
         q = q.where(Invoice.status == inv_status)
         count_q = count_q.where(Invoice.status == inv_status)
-    if vendor_id:
+    if scoped_vendor_id is not None:
+        q = q.where(Invoice.vendor_id == scoped_vendor_id)
+        count_q = count_q.where(Invoice.vendor_id == scoped_vendor_id)
+    elif vendor_id:
         q = q.where(Invoice.vendor_id == vendor_id)
         count_q = count_q.where(Invoice.vendor_id == vendor_id)
     if po_id:

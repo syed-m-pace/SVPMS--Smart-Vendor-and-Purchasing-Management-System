@@ -272,3 +272,11 @@ mobile/lib/
 3. **E2E Testing**: PASS (31/31). Full 6-persona cycle verified.
 4. **Status**: **READY FOR DEPLOYMENT**. User needs to run scripts manually due to local CLI requirements.
 
+## Post-Verification Fixes & Enhancements (Feb 20, 2026)
+
+### Vendor Portal (Mobile) & Backend Adjustments
+- **Vendor API Scoping**: `/api/v1/invoices` was returning all invoices regardless of vendor role. Updated to scope by `_resolve_vendor_for_user()` just like `/api/v1/purchase-orders`. This ensures vendors only see their own invoices.
+- **Vendor Profile API**: Added `bank_account` (decrypted) and `contact_person` (mapped to `phone`) fields to `VendorResponse` to support Mobile App profile rendering.
+- **Mobile App Profile UI**: Fixed `ProfileScreen` styling to center Name and Email cleanly inside a card-like bordered container with proper spacing.
+- **PO Polling Fix**: Removed the infinite `useEffect` loop in the Web App (`PurchaseOrdersPage`) that was repeatedly calling the DB for Vendors. Load occurs exactly once now.
+
