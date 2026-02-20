@@ -55,6 +55,13 @@ class PODetailLoaded extends POState {
   List<Object?> get props => [po];
 }
 
+class POAcknowledging extends POState {
+  final PurchaseOrder po;
+  POAcknowledging(this.po);
+  @override
+  List<Object?> get props => [po];
+}
+
 class POAcknowledged extends POState {
   final PurchaseOrder po;
   POAcknowledged(this.po);
@@ -103,6 +110,12 @@ class POBloc extends Bloc<POEvent, POState> {
     AcknowledgePO event,
     Emitter<POState> emit,
   ) async {
+    final currentState = state;
+    if (currentState is PODetailLoaded) {
+      emit(POAcknowledging(currentState.po));
+    } else if (currentState is POAcknowledged) {
+      emit(POAcknowledging(currentState.po));
+    }
     try {
       final po = await _repo.acknowledge(event.id, event.expectedDeliveryDate);
       emit(POAcknowledged(po));

@@ -41,6 +41,8 @@ class PODetailScreen extends StatelessWidget {
                 ? state.po
                 : state is POAcknowledged
                 ? state.po
+                : state is POAcknowledging
+                ? state.po
                 : null;
 
             if (po == null) return const SizedBox();
@@ -120,9 +122,24 @@ class PODetailScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () => _ack(context, po.id),
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('Acknowledge PO'),
+                        onPressed: state is POAcknowledging
+                            ? null
+                            : () => _ack(context, po.id),
+                        icon: state is POAcknowledging
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check_circle_outline),
+                        label: Text(
+                          state is POAcknowledging
+                              ? 'Acknowledging...'
+                              : 'Acknowledge PO',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.success,
                           padding: const EdgeInsets.symmetric(vertical: 14),

@@ -126,6 +126,7 @@ class _POCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: () => context.go('/purchase-orders/${po.id}'),
         title: Text(
           po.poNumber,
           style: const TextStyle(fontWeight: FontWeight.w600),
