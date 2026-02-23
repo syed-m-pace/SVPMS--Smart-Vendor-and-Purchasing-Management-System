@@ -174,6 +174,8 @@ export interface Invoice {
     document_url: string | null;
     ocr_data: Record<string, unknown> | null;
     match_exceptions: Record<string, unknown> | null;
+    approved_payment_at?: string | null;
+    paid_at?: string | null;
     line_items: InvoiceLineItem[];
     created_at: string;
     updated_at: string;

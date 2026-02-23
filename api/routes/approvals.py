@@ -84,23 +84,41 @@ async def _enrich_approval(db: AsyncSession, a: Approval) -> dict:
     return data
 
 
+PRIVILEGED_ROLES = {"admin", "finance_head", "cfo", "procurement_lead", "manager"}
+
+
 @router.get("", response_model=PaginatedResponse[ApprovalListResponse])
 async def list_approvals(
     status_filter: str = Query(None, alias="status"),
+    entity_type_filter: str = Query(None, alias="entity_type"),
+    entity_id_filter: str = Query(None, alias="entity_id"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    """List approvals assigned to the current user."""
-    q = select(Approval).where(Approval.approver_id == current_user["user_id"])
-    count_q = select(func.count(Approval.id)).where(
-        Approval.approver_id == current_user["user_id"]
-    )
+    """List approvals. Privileged roles can query by entity_id for full audit view."""
+    is_privileged = current_user.get("role") in PRIVILEGED_ROLES
+
+    # When entity_id is provided and user is privileged, show all approvals for that entity
+    if entity_id_filter and is_privileged:
+        q = select(Approval)
+        count_q = select(func.count(Approval.id))
+    else:
+        q = select(Approval).where(Approval.approver_id == current_user["user_id"])
+        count_q = select(func.count(Approval.id)).where(
+            Approval.approver_id == current_user["user_id"]
+        )
 
     if status_filter:
         q = q.where(Approval.status == status_filter)
         count_q = count_q.where(Approval.status == status_filter)
+    if entity_id_filter:
+        q = q.where(Approval.entity_id == entity_id_filter)
+        count_q = count_q.where(Approval.entity_id == entity_id_filter)
+    if entity_type_filter:
+        q = q.where(Approval.entity_type == entity_type_filter)
+        count_q = count_q.where(Approval.entity_type == entity_type_filter)
 
     total = (await db.execute(count_q)).scalar() or 0
     result = await db.execute(
@@ -110,10 +128,48 @@ async def list_approvals(
     )
     raw_approvals = result.scalars().all()
 
+    # Batch-load PR and User data for all approvals — avoids N+1 queries
+    pr_ids = [a.entity_id for a in raw_approvals if a.entity_type in ("PurchaseRequest", "PR")]
+    pr_map: dict = {}
+    user_map: dict = {}
+
+    if pr_ids:
+        pr_result = await db.execute(
+            select(PurchaseRequest).where(PurchaseRequest.id.in_(pr_ids))
+        )
+        pr_map = {str(pr.id): pr for pr in pr_result.scalars().all()}
+
+        requester_ids = list({str(pr.requester_id) for pr in pr_map.values()})
+        if requester_ids:
+            user_result = await db.execute(
+                select(User).where(User.id.in_(requester_ids))
+            )
+            user_map = {str(u.id): u for u in user_result.scalars().all()}
+
     items = []
     for a in raw_approvals:
-        enriched = await _enrich_approval(db, a)
-        items.append(ApprovalListResponse(**enriched))
+        data = {
+            "id": str(a.id),
+            "tenant_id": str(a.tenant_id),
+            "entity_type": a.entity_type,
+            "entity_id": str(a.entity_id),
+            "approver_id": str(a.approver_id),
+            "approval_level": a.approval_level,
+            "status": a.status,
+            "comments": a.comments,
+            "approved_at": a.approved_at.isoformat() if a.approved_at else None,
+            "created_at": a.created_at.isoformat() if a.created_at else "",
+        }
+        if a.entity_type in ("PurchaseRequest", "PR"):
+            pr = pr_map.get(str(a.entity_id))
+            if pr:
+                data["entity_number"] = pr.pr_number
+                data["total_cents"] = pr.total_cents
+                data["description"] = pr.description
+                user = user_map.get(str(pr.requester_id))
+                if user:
+                    data["requester_name"] = f"{user.first_name} {user.last_name}"
+        items.append(ApprovalListResponse(**data))
 
     return PaginatedResponse(
         data=items, pagination=build_pagination(page, limit, total)

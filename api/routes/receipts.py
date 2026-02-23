@@ -1,6 +1,6 @@
 from datetime import datetime, date as date_type
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -8,6 +8,7 @@ import structlog
 from api.middleware.auth import get_current_user
 from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
+from api.models.invoice import Invoice
 from api.models.receipt import Receipt, ReceiptLineItem
 from api.models.purchase_order import PurchaseOrder, PoLineItem
 from api.schemas.receipt import (
@@ -82,10 +83,19 @@ async def list_receipts(
     )
     receipts = result.scalars().all()
 
+    # Batch-load all line items in a single query instead of N per-receipt queries
+    receipt_ids = [r.id for r in receipts]
+    li_map: dict = {}
+    if receipt_ids:
+        li_result = await db.execute(
+            select(ReceiptLineItem).where(ReceiptLineItem.receipt_id.in_(receipt_ids))
+        )
+        for li in li_result.scalars().all():
+            li_map.setdefault(str(li.receipt_id), []).append(li)
+
     items = []
     for r in receipts:
-        line_items = await _get_line_items(db, r.id)
-        items.append(_to_response(r, line_items))
+        items.append(_to_response(r, li_map.get(str(r.id), [])))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -108,6 +118,7 @@ async def get_receipt(
 @router.post("", response_model=ReceiptResponse, status_code=status.HTTP_201_CREATED)
 async def create_receipt(
     body: ReceiptCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -196,4 +207,19 @@ async def create_receipt(
     await db.refresh(receipt)
     line_items = await _get_line_items(db, receipt.id)
     logger.info("receipt_created", receipt_id=str(receipt.id), po_id=str(po.id))
+
+    # Trigger 3-way match for any open invoices against this PO
+    from api.jobs.three_way_match import run_three_way_match
+    invoice_result = await db.execute(
+        select(Invoice).where(
+            Invoice.po_id == po.id,
+            Invoice.status.in_(["UPLOADED", "EXCEPTION"]),
+            Invoice.deleted_at == None,  # noqa: E711
+        )
+    )
+    for inv in invoice_result.scalars().all():
+        background_tasks.add_task(
+            run_three_way_match, str(inv.id), str(current_user["tenant_id"])
+        )
+
     return _to_response(receipt, line_items)

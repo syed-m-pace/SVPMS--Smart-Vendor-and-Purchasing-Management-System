@@ -24,6 +24,11 @@ class InvoiceRepository {
         .toList();
   }
 
+  Future<Invoice> disputeInvoice(String id, {String? reason}) async {
+    final data = await _api.disputeInvoice(id, reason: reason);
+    return Invoice.fromJson(data);
+  }
+
   Future<Invoice> upload({
     required String poId,
     required String invoiceNumber,

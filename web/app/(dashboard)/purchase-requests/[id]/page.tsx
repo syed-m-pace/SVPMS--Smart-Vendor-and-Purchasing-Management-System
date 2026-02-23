@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { prService } from "@/lib/api/purchase-requests";
+import { api } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { PurchaseRequest } from "@/types/models";
+import type { PurchaseRequest, Approval } from "@/types/models";
 import { toast } from "sonner";
 
 function getApiErrorMessage(error: unknown, fallback: string) {
@@ -40,6 +41,7 @@ export default function PRDetailPage() {
     const router = useRouter();
     const user = useAuthStore((s) => s.user);
     const [pr, setPr] = useState<PurchaseRequest | null>(null);
+    const [approvals, setApprovals] = useState<Approval[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [retractOpen, setRetractOpen] = useState(false);
@@ -49,7 +51,14 @@ export default function PRDetailPage() {
     const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
-        prService.get(params.id as string).then(setPr).catch(() => toast.error("Failed")).finally(() => setLoading(false));
+        const prId = params.id as string;
+        Promise.all([
+            prService.get(prId),
+            api.get("/approvals", { params: { entity_type: "PurchaseRequest", entity_id: prId, limit: 10 } }),
+        ]).then(([prData, approvalsRes]) => {
+            setPr(prData);
+            setApprovals(approvalsRes.data.data || []);
+        }).catch(() => toast.error("Failed")).finally(() => setLoading(false));
     }, [params.id]);
 
     async function handleSubmit() {
@@ -178,6 +187,42 @@ export default function PRDetailPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {approvals.length > 0 && (
+                <Card>
+                    <CardHeader><CardTitle className="text-lg">Approval Chain</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {[...approvals].sort((a, b) => a.approval_level - b.approval_level).map((approval) => (
+                                <div key={approval.id} className="flex items-start gap-3">
+                                    <div className={`mt-1 h-5 w-5 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+                                        approval.status === "APPROVED" ? "bg-green-100 text-green-700" :
+                                        approval.status === "REJECTED" ? "bg-red-100 text-red-700" :
+                                        "bg-muted text-muted-foreground"
+                                    }`}>
+                                        {approval.status === "APPROVED" ? "✓" : approval.status === "REJECTED" ? "✗" : "⏳"}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium">
+                                            Level {approval.approval_level}
+                                            {approval.requester_name && <span className="text-muted-foreground font-normal"> — {approval.requester_name}</span>}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <StatusBadge status={approval.status} />
+                                            {approval.approved_at && (
+                                                <span className="text-xs text-muted-foreground">{formatDate(approval.approved_at)}</span>
+                                            )}
+                                        </div>
+                                        {approval.comments && (
+                                            <p className="text-xs text-muted-foreground mt-1 italic">"{approval.comments}"</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Dialog open={retractOpen} onOpenChange={setRetractOpen}>
                 <DialogContent>

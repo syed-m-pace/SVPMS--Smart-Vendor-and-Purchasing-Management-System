@@ -78,4 +78,5 @@ class ReceiptLineItem(Base):
             "condition IN ('GOOD','DAMAGED','PARTIAL')",
             name="chk_receipt_line_condition",
         ),
+        Index("idx_receipt_line_items_receipt", "receipt_id"),
     )

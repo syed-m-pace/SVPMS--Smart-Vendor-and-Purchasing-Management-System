@@ -25,13 +25,13 @@ def _get_db_url() -> str:
     return url
 
 
-from sqlalchemy.pool import NullPool
-
-# Use NullPool to avoid "Event loop is closed" errors in async tests
-# where the loop is closed before the pool is disposed.
 engine: AsyncEngine = create_async_engine(
     _get_db_url(),
-    poolclass=NullPool,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=30,
+    pool_recycle=settings.DB_POOL_RECYCLE,
+    pool_pre_ping=True,
     echo=settings.DEBUG,
     connect_args={"ssl": "require"},
 )

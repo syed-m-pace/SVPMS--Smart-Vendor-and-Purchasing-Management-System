@@ -7,6 +7,7 @@ import '../../../core/utils/date_formatter.dart';
 import '../../../data/models/invoice.dart';
 import '../../../data/repositories/invoice_repository.dart';
 import '../../widgets/status_badge.dart';
+import '../bloc/invoice_bloc.dart';
 
 class InvoiceDetailScreen extends StatefulWidget {
   final String invoiceId;
@@ -44,6 +45,49 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
+  void _showDisputeDialog(BuildContext context, String invoiceId) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dispute Invoice'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Provide a reason for disputing this invoice (optional):'),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Amount does not match agreed price',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<InvoiceBloc>().add(DisputeInvoice(
+                invoiceId: invoiceId,
+                reason: reasonController.text.trim().isEmpty
+                    ? null
+                    : reasonController.text.trim(),
+              ));
+            },
+            child: const Text('Dispute'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openDocument() async {
     final docUrl = _invoice?.documentUrl;
     if (docUrl == null) return;
@@ -72,9 +116,23 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Invoice')),
-      body: _buildBody(),
+    return BlocListener<InvoiceBloc, InvoiceState>(
+      listener: (context, state) {
+        if (state is InvoiceDisputed) {
+          setState(() => _invoice = state.invoice);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invoice disputed successfully')),
+          );
+        } else if (state is InvoiceError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${state.message}')),
+          );
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Invoice')),
+        body: _buildBody(),
+      ),
     );
   }
 
@@ -204,6 +262,21 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
               message:
                   'A match exception was detected. Contact your procurement team to resolve.',
             ),
+            if (inv.status == 'EXCEPTION') ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.report_problem_outlined),
+                  label: const Text('Dispute This Invoice'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => _showDisputeDialog(context, inv.id),
+                ),
+              ),
+            ],
           ],
           if (inv.status == 'PAID') ...[
             const SizedBox(height: 16),

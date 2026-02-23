@@ -247,6 +247,17 @@ class ApiClient {
     return resp.data;
   }
 
+  Future<Map<String, dynamic>> disputeInvoice(
+    String id, {
+    String? reason,
+  }) async {
+    final resp = await dio.post(
+      '/api/v1/invoices/$id/dispute',
+      data: {'reason': reason ?? ''},
+    );
+    return resp.data;
+  }
+
   Future<Map<String, dynamic>> getFilePresignedUrl(String fileKey) async {
     final resp = await dio.get('/api/v1/files/$fileKey');
     return resp.data;

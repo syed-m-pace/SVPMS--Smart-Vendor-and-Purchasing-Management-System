@@ -29,16 +29,17 @@ export default function DashboardPage() {
         async function load() {
             try {
                 // Fetch dashboard data in parallel
-                const [prRes, budgetRes] = await Promise.all([
-                    api.get("/purchase-requests", { params: { per_page: 5 } }),
-                    api.get("/budgets", { params: { fiscal_year: 2026, quarter: 1 } }), // Fetch Q1 2026 budgets
+                const [prRes, budgetRes, poRes, invoiceRes] = await Promise.all([
+                    api.get("/purchase-requests", { params: { limit: 5 } }),
+                    api.get("/budgets", { params: { fiscal_year: 2026, quarter: 1 } }),
+                    api.get("/purchase-orders", { params: { status: "ISSUED", limit: 1 } }),
+                    api.get("/invoices", { params: { status: "EXCEPTION", limit: 1 } }),
                 ]);
 
                 const prData = prRes.data;
                 const prs = prData.data || prData;
                 setRecentPRs(Array.isArray(prs) ? prs : []);
 
-                // Calculate stats from available data
                 const pendingPRs = Array.isArray(prs)
                     ? prs.filter((p: any) => p.status === "PENDING").length
                     : 0;
@@ -50,8 +51,8 @@ export default function DashboardPage() {
 
                 setStats({
                     pending_prs: pendingPRs,
-                    active_pos: 0,
-                    invoice_exceptions: 0,
+                    active_pos: poRes.data.pagination?.total ?? 0,
+                    invoice_exceptions: invoiceRes.data.pagination?.total ?? 0,
                     budget_utilization: utilization,
                 });
             } catch (err) {

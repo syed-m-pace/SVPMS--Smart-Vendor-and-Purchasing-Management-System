@@ -13,8 +13,10 @@ from api.database import AsyncSessionLocal, set_tenant_context
 from api.models.invoice import Invoice
 from api.models.purchase_order import PurchaseOrder
 from api.models.receipt import Receipt
+from api.models.user import User
 from api.services.matching_service import three_way_match_invoice, match_result_to_dict
 from api.services.audit_service import create_audit_log
+from api.services.notification_service import send_notification
 
 logger = structlog.get_logger()
 
@@ -57,6 +59,26 @@ async def run_three_way_match(invoice_id: str, tenant_id: str):
                 invoice.status = "EXCEPTION"
                 invoice.match_status = "FAIL"
                 invoice.match_exceptions = match_result_to_dict(result)
+
+                # Notify finance team about exception
+                finance_result = await session.execute(
+                    select(User.email).where(
+                        User.tenant_id == invoice.tenant_id,
+                        User.role.in_(["finance_head", "cfo", "finance"]),
+                        User.is_active == True,  # noqa: E712
+                        User.deleted_at == None,  # noqa: E711
+                    )
+                )
+                finance_emails = [row[0] for row in finance_result.all()]
+                if finance_emails:
+                    await send_notification(
+                        "invoice_exception",
+                        finance_emails,
+                        {
+                            "invoice_number": invoice.invoice_number or str(invoice.id),
+                            "po_id": str(invoice.po_id),
+                        },
+                    )
 
             after = {"status": invoice.status, "match_status": invoice.match_status}
 

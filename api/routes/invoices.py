@@ -15,11 +15,13 @@ from api.schemas.invoice import (
     InvoiceCreate,
     InvoiceResponse,
     InvoiceLineItemResponse,
+    InvoicePaymentActionRequest,
     InvoiceDisputeRequest,
     InvoiceOverrideRequest,
 )
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
+from api.services.notification_service import send_notification
 from api.services.storage import r2_client
 
 logger = structlog.get_logger()
@@ -55,6 +57,8 @@ def _to_response(inv: Invoice, line_items: list[InvoiceLineItem], vendor_name: s
         ocr_status=inv.ocr_status,
         ocr_data=inv.ocr_data,
         match_exceptions=inv.match_exceptions,
+        approved_payment_at=inv.approved_payment_at.isoformat() if inv.approved_payment_at else None,
+        paid_at=inv.paid_at.isoformat() if inv.paid_at else None,
         line_items=[_line_to_response(li) for li in line_items],
         created_at=inv.created_at.isoformat() if inv.created_at else "",
         updated_at=inv.updated_at.isoformat() if inv.updated_at else "",
@@ -117,10 +121,21 @@ async def list_invoices(
     )
     rows = result.all()
 
+    # Batch-load all line items in a single query instead of N per-invoice queries
+    invoice_ids = [row[0].id for row in rows]
+    li_map: dict = {}
+    if invoice_ids:
+        li_result = await db.execute(
+            select(InvoiceLineItem)
+            .where(InvoiceLineItem.invoice_id.in_(invoice_ids))
+            .order_by(InvoiceLineItem.invoice_id, InvoiceLineItem.line_number)
+        )
+        for li in li_result.scalars().all():
+            li_map.setdefault(str(li.invoice_id), []).append(li)
+
     items = []
     for inv, vendor_name, po_number in rows:
-        line_items = await _get_line_items(db, inv.id)
-        items.append(_to_response(inv, line_items, vendor_name=vendor_name or "", po_number=po_number or ""))
+        items.append(_to_response(inv, li_map.get(str(inv.id), []), vendor_name=vendor_name or "", po_number=po_number or ""))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -326,3 +341,127 @@ async def override_invoice(
     line_items = await _get_line_items(db, inv.id)
     logger.info("invoice_overridden", invoice_id=str(inv.id), reason=body.reason, by=current_user["user_id"])
     return _to_response(inv, line_items)
+
+
+@router.post("/{invoice_id}/approve-payment", response_model=InvoiceResponse)
+async def approve_payment(
+    invoice_id: str,
+    body: InvoicePaymentActionRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("finance_head", "cfo", "admin")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(
+        select(Invoice, Vendor.legal_name, PurchaseOrder.po_number)
+        .join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
+        .join(PurchaseOrder, Invoice.po_id == PurchaseOrder.id, isouter=True)
+        .where(Invoice.id == invoice_id)
+    )
+    row = result.one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    inv, vendor_name, po_number = row
+
+    if inv.status != "MATCHED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only approve payment for invoices in MATCHED status",
+        )
+
+    from datetime import datetime
+    before = {"status": inv.status}
+    inv.status = "APPROVED"
+    inv.approved_payment_at = datetime.utcnow()
+    after = {"status": inv.status}
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="INVOICE_PAYMENT_APPROVED",
+        entity_type="INVOICE",
+        entity_id=str(inv.id),
+        before_state=before,
+        after_state=after,
+        actor_email=current_user.get("email"),
+    )
+
+    vendor_email_result = await db.execute(
+        select(Vendor.email).where(Vendor.id == inv.vendor_id)
+    )
+    v_email = vendor_email_result.scalar_one_or_none()
+    if v_email:
+        background_tasks.add_task(
+            send_notification,
+            "payment_approved",
+            [v_email],
+            {"invoice_number": inv.invoice_number},
+        )
+
+    await db.flush()
+    line_items = await _get_line_items(db, inv.id)
+    logger.info("invoice_payment_approved", invoice_id=str(inv.id), by=current_user["user_id"])
+    return _to_response(inv, line_items, vendor_name=vendor_name or "", po_number=po_number or "")
+
+
+@router.post("/{invoice_id}/pay", response_model=InvoiceResponse)
+async def mark_paid(
+    invoice_id: str,
+    body: InvoicePaymentActionRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("finance_head", "cfo", "admin")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(
+        select(Invoice, Vendor.legal_name, PurchaseOrder.po_number)
+        .join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
+        .join(PurchaseOrder, Invoice.po_id == PurchaseOrder.id, isouter=True)
+        .where(Invoice.id == invoice_id)
+    )
+    row = result.one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    inv, vendor_name, po_number = row
+
+    if inv.status != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only mark invoices as PAID when in APPROVED status",
+        )
+
+    from datetime import datetime
+    before = {"status": inv.status}
+    inv.status = "PAID"
+    inv.paid_at = datetime.utcnow()
+    after = {"status": inv.status}
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="INVOICE_PAID",
+        entity_type="INVOICE",
+        entity_id=str(inv.id),
+        before_state=before,
+        after_state=after,
+        actor_email=current_user.get("email"),
+    )
+
+    vendor_email_result = await db.execute(
+        select(Vendor.email).where(Vendor.id == inv.vendor_id)
+    )
+    v_email = vendor_email_result.scalar_one_or_none()
+    if v_email:
+        background_tasks.add_task(
+            send_notification,
+            "invoice_paid",
+            [v_email],
+            {"invoice_number": inv.invoice_number},
+        )
+
+    await db.flush()
+    line_items = await _get_line_items(db, inv.id)
+    logger.info("invoice_paid", invoice_id=str(inv.id), by=current_user["user_id"])
+    return _to_response(inv, line_items, vendor_name=vendor_name or "", po_number=po_number or "")

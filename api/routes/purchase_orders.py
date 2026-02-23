@@ -22,7 +22,7 @@ from api.schemas.purchase_order import (
     AcknowledgeRequest,
 )
 from api.schemas.common import PaginatedResponse, build_pagination
-from api.services.budget_service import release_budget_reservation
+from api.services.budget_service import release_budget_reservation, commit_budget_spent
 from api.services.audit_service import create_audit_log
 from api.services.notification_service import send_notification
 from api.services.push_service import send_push
@@ -353,6 +353,10 @@ async def create_purchase_order(
     await db.flush()
     line_items = await _get_line_items(db, po.id)
 
+    # Move budget reservation from COMMITTED → SPENT
+    if po.pr_id:
+        await commit_budget_spent(db, "PR", str(pr.id))
+
     # Notify vendor via push + email. Failures should not block PO creation.
     try:
         vendor_user_ids_result = await db.execute(
@@ -488,4 +492,50 @@ async def cancel_purchase_order(
     await db.flush()
     line_items = await _get_line_items(db, po.id)
     logger.info("po_cancelled", po_id=str(po.id), reason=body.reason, by=current_user["user_id"])
+    return _to_response(po, line_items, vendor_name=vendor_name)
+
+
+@router.post("/{po_id}/close", response_model=PurchaseOrderResponse)
+async def close_purchase_order(
+    po_id: str,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(
+        select(PurchaseOrder, Vendor.legal_name).join(Vendor, PurchaseOrder.vendor_id == Vendor.id).where(
+            PurchaseOrder.id == po_id, PurchaseOrder.deleted_at == None  # noqa: E711
+        )
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    po, vendor_name = row
+
+    if po.status not in ("FULFILLED", "ACKNOWLEDGED"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot close purchase order in '{po.status}' status (must be FULFILLED or ACKNOWLEDGED)",
+        )
+
+    before = {"status": po.status}
+    po.status = "CLOSED"
+    after = {"status": po.status}
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="PO_CLOSED",
+        entity_type="PO",
+        entity_id=str(po.id),
+        before_state=before,
+        after_state=after,
+        actor_email=current_user.get("email"),
+    )
+
+    await db.flush()
+    line_items = await _get_line_items(db, po.id)
+    logger.info("po_closed", po_id=str(po.id), by=current_user["user_id"])
     return _to_response(po, line_items, vendor_name=vendor_name)

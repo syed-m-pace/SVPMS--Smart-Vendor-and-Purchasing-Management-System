@@ -57,6 +57,8 @@ class Rfq(Base):
             "status IN ('DRAFT','OPEN','CLOSED','AWARDED','CANCELLED')",
             name="chk_rfq_status",
         ),
+        Index("idx_rfqs_tenant", "tenant_id"),
+        Index("idx_rfqs_status", "status"),
     )
 
 
@@ -77,6 +79,7 @@ class RfqLineItem(Base):
 
     __table_args__ = (
         CheckConstraint("quantity > 0", name="chk_rfq_line_qty"),
+        Index("idx_rfq_line_items_rfq", "rfq_id"),
     )
 
 

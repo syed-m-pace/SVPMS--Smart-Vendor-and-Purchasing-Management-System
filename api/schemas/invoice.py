@@ -47,11 +47,17 @@ class InvoiceResponse(BaseModel):
     ocr_status: Optional[str] = None
     ocr_data: Optional[dict] = None
     match_exceptions: Optional[dict] = None
+    approved_payment_at: Optional[str] = None
+    paid_at: Optional[str] = None
     line_items: List[InvoiceLineItemResponse] = []
     created_at: str
     updated_at: str
 
     model_config = {"from_attributes": True}
+
+
+class InvoicePaymentActionRequest(BaseModel):
+    notes: Optional[str] = None
 
 
 class InvoiceDisputeRequest(BaseModel):

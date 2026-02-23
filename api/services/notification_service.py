@@ -74,6 +74,22 @@ TEMPLATES = {
             "<p>Please log in to the SVPMS Vendor App to view the details and submit your bid.</p>"
         ),
     },
+    "payment_approved": {
+        "subject": "[SVPMS] Your invoice {invoice_number} has been approved for payment",
+        "html": (
+            "<h2>Invoice Approved for Payment</h2>"
+            "<p>Your invoice <strong>{invoice_number}</strong> has been approved for payment.</p>"
+            "<p>Payment will be processed in accordance with the agreed payment terms.</p>"
+        ),
+    },
+    "invoice_paid": {
+        "subject": "[SVPMS] Your invoice {invoice_number} has been paid",
+        "html": (
+            "<h2>Invoice Paid</h2>"
+            "<p>Your invoice <strong>{invoice_number}</strong> has been paid.</p>"
+            "<p>Please check your bank account for the payment confirmation.</p>"
+        ),
+    },
     "po_awarded": {
         "subject": "[SVPMS] Congratulations — Your bid on {rfq_number} has been selected!",
         "html": (

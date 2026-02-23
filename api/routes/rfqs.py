@@ -106,7 +106,8 @@ async def list_rfqs(
     q = select(Rfq)
     count_q = select(func.count(Rfq.id))
 
-    # Vendor role: only OPEN RFQs + AWARDED RFQs where they are the winning vendor
+    # Resolve vendor once for scoping and bid filtering
+    scoped_vendor = None
     if current_user["role"] == "vendor":
         vendor_result = await db.execute(
             select(Vendor).where(
@@ -114,16 +115,15 @@ async def list_rfqs(
                 Vendor.deleted_at == None,  # noqa: E711
             )
         )
-        vendor = vendor_result.scalar_one_or_none()
-        if not vendor:
+        scoped_vendor = vendor_result.scalar_one_or_none()
+        if not scoped_vendor:
             return PaginatedResponse(data=[], pagination=build_pagination(page, limit, 0))
         vendor_filter = or_(
             Rfq.status == "OPEN",
-            (Rfq.status == "AWARDED") & (Rfq.awarded_vendor_id == vendor.id),
+            (Rfq.status == "AWARDED") & (Rfq.awarded_vendor_id == scoped_vendor.id),
         )
         q = q.where(vendor_filter)
         count_q = count_q.where(vendor_filter)
-        # Allow further status filter only within the vendor's visible scope
         if rfq_status:
             q = q.where(Rfq.status == rfq_status)
             count_q = count_q.where(Rfq.status == rfq_status)
@@ -137,9 +137,47 @@ async def list_rfqs(
     )
     rfqs = result.scalars().all()
 
-    items = []
-    for rfq in rfqs:
-        items.append(await _build_response(db, rfq, current_user))
+    # Batch-load line items and bids for all RFQs — avoids N+1 queries
+    rfq_ids = [rfq.id for rfq in rfqs]
+    li_map: dict = {}
+    bids_map: dict = {}
+
+    if rfq_ids:
+        li_result = await db.execute(
+            select(RfqLineItem).where(RfqLineItem.rfq_id.in_(rfq_ids))
+        )
+        for li in li_result.scalars().all():
+            li_map.setdefault(str(li.rfq_id), []).append(li)
+
+        bids_q = (
+            select(RfqBid)
+            .where(RfqBid.rfq_id.in_(rfq_ids))
+            .order_by(RfqBid.total_cents)
+        )
+        if scoped_vendor is not None:
+            bids_q = bids_q.where(RfqBid.vendor_id == str(scoped_vendor.id))
+        bids_result = await db.execute(bids_q)
+        for b in bids_result.scalars().all():
+            bids_map.setdefault(str(b.rfq_id), []).append(b)
+
+    items = [
+        RfqResponse(
+            id=str(rfq.id),
+            tenant_id=str(rfq.tenant_id),
+            rfq_number=rfq.rfq_number,
+            title=rfq.title,
+            pr_id=str(rfq.pr_id) if rfq.pr_id else None,
+            status=rfq.status,
+            deadline=rfq.deadline.isoformat() if rfq.deadline else "",
+            created_by=str(rfq.created_by),
+            awarded_vendor_id=str(rfq.awarded_vendor_id) if rfq.awarded_vendor_id else None,
+            awarded_po_id=str(rfq.awarded_po_id) if rfq.awarded_po_id else None,
+            line_items=[_line_to_response(li) for li in li_map.get(str(rfq.id), [])],
+            bids=[_bid_to_response(b) for b in bids_map.get(str(rfq.id), [])],
+            created_at=rfq.created_at.isoformat() if rfq.created_at else "",
+        )
+        for rfq in rfqs
+    ]
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -273,6 +311,30 @@ async def close_rfq(
 
     rfq.status = "CLOSED"
     await db.flush()
+    return await _build_response(db, rfq)
+
+
+@router.post("/{rfq_id}/cancel", response_model=RfqResponse)
+async def cancel_rfq(
+    rfq_id: str,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(select(Rfq).where(Rfq.id == rfq_id))
+    rfq = result.scalar_one_or_none()
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    if rfq.status not in ("OPEN", "CLOSED"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel RFQ in '{rfq.status}' status (must be OPEN or CLOSED)",
+        )
+
+    rfq.status = "CANCELLED"
+    await db.flush()
+    logger.info("rfq_cancelled", rfq_id=rfq_id, by=current_user["user_id"])
     return await _build_response(db, rfq)
 
 

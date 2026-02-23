@@ -46,6 +46,8 @@ class Invoice(Base):
     ocr_data: Mapped[Optional[dict]] = mapped_column(JSONB)
     match_status: Mapped[Optional[str]] = mapped_column(String(50))
     match_exceptions: Mapped[Optional[dict]] = mapped_column(JSONB)
+    approved_payment_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow
     )

@@ -67,6 +67,7 @@ from api.routes.devices import router as devices_router  # noqa: E402
 from api.routes.match import router as match_router  # noqa: E402
 from api.jobs.scheduled import router as jobs_router  # noqa: E402
 from api.routes.approvals import router as approvals_router  # noqa: E402
+from api.routes.audit_logs import router as audit_logs_router  # noqa: E402
 
 # Rate limiting middleware (Upstash Redis)
 from api.middleware.rate_limit import rate_limit_middleware  # noqa: E402
@@ -86,4 +87,5 @@ app.include_router(files_router, prefix="/api/v1/files", tags=["Files"])
 app.include_router(devices_router, prefix="/api/v1/users/me/devices", tags=["Devices"])
 app.include_router(match_router, prefix="/api/v1/match", tags=["Matching"])
 app.include_router(approvals_router, prefix="/api/v1/approvals", tags=["Approvals"])
+app.include_router(audit_logs_router, prefix="/api/v1/audit-logs", tags=["Audit Logs"])
 app.include_router(jobs_router, prefix="/internal/jobs", tags=["Internal Jobs"])
