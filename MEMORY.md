@@ -65,6 +65,7 @@
 - **Thresholds (cents)**: <5M = manager, 5M-20M = +finance_head, >=20M = +CFO
 - **Notifications**: Resolve emails during request, dispatch via BackgroundTasks (fire-and-forget)
 - **No explicit db.commit()**: Let get_db() auto-commit for atomicity
+- **Dashboard Stats**: Replaced multiple list API fetches with a dedicated `/api/v1/dashboard/stats` endpoint using concurrent `COUNT` and `SUM` queries mapped to a single JSON response for minimal latency.
 
 ## Seed Data (key UUIDs for testing)
 - Tenant ACME: `a0000000-0000-0000-0000-000000000001`

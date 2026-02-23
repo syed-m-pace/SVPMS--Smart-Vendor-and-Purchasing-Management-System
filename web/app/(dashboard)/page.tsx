@@ -28,33 +28,17 @@ export default function DashboardPage() {
     useEffect(() => {
         async function load() {
             try {
-                // Fetch dashboard data in parallel
-                const [prRes, budgetRes, poRes, invoiceRes] = await Promise.all([
+                // Fetch low-latency dashboard stats and recent PRs in parallel
+                const [statsRes, prRes] = await Promise.all([
+                    api.get("/dashboard/stats"),
                     api.get("/purchase-requests", { params: { limit: 5 } }),
-                    api.get("/budgets", { params: { fiscal_year: 2026, quarter: 1 } }),
-                    api.get("/purchase-orders", { params: { status: "ISSUED", limit: 1 } }),
-                    api.get("/invoices", { params: { status: "EXCEPTION", limit: 1 } }),
                 ]);
 
                 const prData = prRes.data;
                 const prs = prData.data || prData;
                 setRecentPRs(Array.isArray(prs) ? prs : []);
 
-                const pendingPRs = Array.isArray(prs)
-                    ? prs.filter((p: any) => p.status === "PENDING").length
-                    : 0;
-
-                const budgets = budgetRes.data.data || [];
-                const totalBudget = budgets.reduce((sum: number, b: any) => sum + b.total_cents, 0);
-                const totalSpent = budgets.reduce((sum: number, b: any) => sum + (b.spent_cents || 0), 0);
-                const utilization = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
-
-                setStats({
-                    pending_prs: pendingPRs,
-                    active_pos: poRes.data.pagination?.total ?? 0,
-                    invoice_exceptions: invoiceRes.data.pagination?.total ?? 0,
-                    budget_utilization: utilization,
-                });
+                setStats(statsRes.data);
             } catch (err) {
                 console.error("Dashboard load failed:", err);
                 setStats({ pending_prs: 0, active_pos: 0, invoice_exceptions: 0, budget_utilization: 0 });

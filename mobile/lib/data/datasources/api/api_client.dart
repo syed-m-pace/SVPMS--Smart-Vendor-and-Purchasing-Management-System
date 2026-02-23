@@ -76,70 +76,38 @@ class ApiClient {
   }
 
   // ─── Dashboard (aggregated from POs + Invoices) ───────
-  /// No dedicated dashboard endpoint exists — we aggregate from other APIs
   Future<Map<String, dynamic>> getDashboard() async {
     try {
-      final results = await Future.wait([
-        dio.get(
-          '/api/v1/purchase-orders',
-          queryParameters: {'page': 1, 'limit': 5},
-        ),
-        dio.get('/api/v1/invoices', queryParameters: {'page': 1, 'limit': 5}),
-        dio.get('/api/v1/rfqs', queryParameters: {'page': 1, 'limit': 5}),
-      ]);
-
-      final poData = results[0].data;
-      final invoiceData = results[1].data;
-      final rfqData = results[2].data;
-
-      final poItems = poData['data'] ?? poData['items'] ?? [];
-      final invoiceItems = invoiceData['data'] ?? invoiceData['items'] ?? [];
-      final rfqItems = rfqData['data'] ?? rfqData['items'] ?? [];
-
-      final poTotal =
-          poData['pagination']?['total'] ??
-          poData['total'] ??
-          (poItems as List?)?.length ??
-          0;
-      final invoiceTotal =
-          invoiceData['pagination']?['total'] ??
-          invoiceData['total'] ??
-          (invoiceItems as List?)?.length ??
-          0;
-      final rfqTotal =
-          rfqData['pagination']?['total'] ??
-          rfqData['total'] ??
-          (rfqItems as List?)?.length ??
-          0;
+      final resp = await dio.get('/api/v1/dashboard/stats');
+      final data = resp.data;
 
       return {
-        'active_pos': poTotal,
-        'open_invoices': invoiceTotal,
-        'pending_rfqs': rfqTotal,
-        'pending_prs': 0,
+        'active_pos': data['active_pos'] ?? 0,
+        'open_invoices': data['open_invoices'] ?? 0,
+        'pending_rfqs': data['pending_rfqs'] ?? 0,
+        'pending_prs': data['pending_prs'] ?? 0,
+        'budget_utilization': data['budget_utilization'] ?? 0,
         'stats': {
-          // Kept for backwards compatibility if needed
-          'total_pos': poTotal,
-          'total_invoices': invoiceTotal,
-          'total_rfqs': rfqTotal,
-          'pending_actions': 0,
+          'total_pos': data['active_pos'] ?? 0,
+          'total_invoices': data['open_invoices'] ?? 0,
+          'total_rfqs': data['pending_rfqs'] ?? 0,
+          'pending_actions': data['pending_prs'] ?? 0,
         },
-        'recent_pos': poItems,
       };
     } catch (e) {
-      // Fallback if any endpoint fails
+      // Fallback if endpoint fails
       return {
         'active_pos': 0,
         'open_invoices': 0,
         'pending_rfqs': 0,
         'pending_prs': 0,
+        'budget_utilization': 0,
         'stats': {
           'total_pos': 0,
           'total_invoices': 0,
           'total_rfqs': 0,
           'pending_actions': 0,
         },
-        'recent_pos': [],
       };
     }
   }
