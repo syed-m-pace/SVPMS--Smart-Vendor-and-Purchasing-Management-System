@@ -9,7 +9,7 @@ from api.models.purchase_request import PurchaseRequest
 from api.models.purchase_order import PurchaseOrder
 from api.models.invoice import Invoice
 from api.models.budget import Budget
-from api.models.rfq import RFQ
+from api.models.rfq import Rfq
 from api.services.budget_service import get_current_fiscal_period
 
 router = APIRouter()
@@ -51,7 +51,7 @@ async def get_dashboard_stats(
     open_inv_q = select(func.count(Invoice.id)).where(Invoice.status != "PAID")
     
     # 3c. Pending RFQs count (for mobile)
-    rfq_q = select(func.count(RFQ.id)).where(RFQ.status != "CLOSED")
+    rfq_q = select(func.count(Rfq.id)).where(Rfq.status != "CLOSED")
 
     # 4. Budget Utilization
     fy, q = get_current_fiscal_period()
