@@ -21,6 +21,7 @@ export default function InvoicesPage() {
 
     const columns = [
         { header: "Invoice #", cell: (inv: Invoice) => <span className="font-mono font-medium">{inv.invoice_number}</span> },
+        { header: "Vendor", cell: (inv: Invoice) => <span>{inv.vendor_name || "—"}</span> },
         { header: "Status", cell: (inv: Invoice) => <StatusBadge status={inv.status} /> },
         { header: "Match", cell: (inv: Invoice) => inv.match_status ? <StatusBadge status={inv.match_status} /> : <span className="text-muted-foreground">—</span> },
         { header: "Amount", cell: (inv: Invoice) => <span className="font-mono">{formatCurrency(inv.total_cents)}</span> },

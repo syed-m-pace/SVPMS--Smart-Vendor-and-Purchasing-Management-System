@@ -5,6 +5,7 @@ Firebase Cloud Messaging push notifications.
 Sends multicast push to user devices via Firebase Admin SDK.
 """
 
+import asyncio
 from typing import Optional
 
 from firebase_admin import messaging
@@ -60,7 +61,8 @@ async def send_push(
     )
 
     try:
-        response = messaging.send_each_for_multicast(message)
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, messaging.send_each_for_multicast, message)
         logger.info(
             "push_sent",
             success=response.success_count,

@@ -164,6 +164,7 @@ export interface Invoice {
     tenant_id: string;
     invoice_number: string;
     vendor_id: string;
+    vendor_name?: string | null;
     po_id: string | null;
     status: InvoiceStatus;
     total_cents: number;

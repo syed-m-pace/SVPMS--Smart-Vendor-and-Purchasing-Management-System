@@ -56,6 +56,9 @@ export default function InvoiceDetailPage() {
                 <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-4 w-4" /></Button>
                 <div className="flex-1">
                     <div className="flex items-center gap-3"><h1 className="text-2xl font-bold font-mono">{inv.invoice_number}</h1><StatusBadge status={inv.status} />{inv.match_status && <StatusBadge status={inv.match_status} />}</div>
+                    {inv.vendor_name && (
+                        <p className="text-sm text-muted-foreground mt-1">Vendor: <span className="text-foreground font-medium">{inv.vendor_name}</span></p>
+                    )}
                 </div>
                 {inv.document_url && (
                     <Button variant="outline" onClick={openDocument} disabled={openingDocument}>
@@ -67,7 +70,7 @@ export default function InvoiceDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Total</p><p className="text-2xl font-bold font-mono">{formatCurrency(inv.total_cents)}</p></CardContent></Card>
                 <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Created</p><p className="text-lg font-medium">{formatDate(inv.created_at)}</p></CardContent></Card>
-                <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">OCR Status</p><p className="text-lg font-medium capitalize">{inv.ocr_status || "N/A"}</p></CardContent></Card>
+                <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">OCR Status</p><div className="mt-1">{inv.ocr_status ? <StatusBadge status={inv.ocr_status} /> : <span className="text-lg font-medium text-muted-foreground">N/A</span>}</div></CardContent></Card>
             </div>
 
             <Card>
@@ -87,6 +90,38 @@ export default function InvoiceDetailPage() {
                     </CardContent>
                 </Card>
             )}
+
+            <Card>
+                <CardHeader><CardTitle className="text-lg">Next Steps</CardTitle></CardHeader>
+                <CardContent className="text-sm space-y-3">
+                    {inv.status === "UPLOADED" && (
+                        <p className="text-muted-foreground">OCR processing in progress. The invoice will be automatically matched against the purchase order once extraction completes.</p>
+                    )}
+                    {inv.status === "MATCHED" && (
+                        <p className="text-green-600 font-medium">3-way match passed. This invoice is ready for payment approval.</p>
+                    )}
+                    {(inv.status === "EXCEPTION" || inv.status === "DISPUTED") && (
+                        <div className="space-y-2">
+                            <p className="text-amber-600 font-medium">A match exception was detected. Review the exceptions above and take action.</p>
+                            <div className="flex gap-2 flex-wrap">
+                                <Button variant="outline" size="sm" onClick={async () => {
+                                    const reason = window.prompt("Override reason (min 10 chars):");
+                                    if (!reason || reason.length < 10) return;
+                                    try {
+                                        await api.post(`/invoices/${inv.id}/override`, { reason });
+                                        const updated = await invoiceService.get(inv.id);
+                                        setInv(updated);
+                                        toast.success("Invoice overridden");
+                                    } catch { toast.error("Override failed"); }
+                                }}>Override Match</Button>
+                            </div>
+                        </div>
+                    )}
+                    {inv.status === "PAID" && (
+                        <p className="text-muted-foreground">This invoice has been paid.</p>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader><CardTitle className="text-lg">Line Items</CardTitle></CardHeader>

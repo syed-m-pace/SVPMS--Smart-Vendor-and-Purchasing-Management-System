@@ -46,6 +46,7 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
       body: BlocListener<InvoiceBloc, InvoiceState>(
         listener: (context, state) {
           if (state is InvoiceUploaded) {
+            context.read<InvoiceBloc>().add(LoadInvoices());
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Invoice uploaded successfully'),

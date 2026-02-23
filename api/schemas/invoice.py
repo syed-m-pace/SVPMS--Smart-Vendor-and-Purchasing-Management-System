@@ -35,6 +35,7 @@ class InvoiceResponse(BaseModel):
     invoice_number: str
     po_id: Optional[str] = None
     vendor_id: str
+    vendor_name: Optional[str] = None
     status: str
     invoice_date: str
     due_date: Optional[str] = None

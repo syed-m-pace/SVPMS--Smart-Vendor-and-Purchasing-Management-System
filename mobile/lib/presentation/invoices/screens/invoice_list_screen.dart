@@ -80,6 +80,9 @@ class InvoiceListScreen extends StatelessWidget {
             ),
           );
         }
+        if (state is InvoiceUploaded) {
+          return const Center(child: CircularProgressIndicator());
+        }
         return const SizedBox();
       },
     );

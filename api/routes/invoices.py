@@ -10,6 +10,7 @@ from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
 from api.models.invoice import Invoice, InvoiceLineItem
 from api.models.purchase_order import PurchaseOrder
+from api.models.vendor import Vendor
 from api.schemas.invoice import (
     InvoiceCreate,
     InvoiceResponse,
@@ -35,13 +36,14 @@ def _line_to_response(li: InvoiceLineItem) -> InvoiceLineItemResponse:
     )
 
 
-def _to_response(inv: Invoice, line_items: list[InvoiceLineItem]) -> InvoiceResponse:
+def _to_response(inv: Invoice, line_items: list[InvoiceLineItem], vendor_name: str = "") -> InvoiceResponse:
     return InvoiceResponse(
         id=str(inv.id),
         tenant_id=str(inv.tenant_id),
         invoice_number=inv.invoice_number,
         po_id=str(inv.po_id) if inv.po_id else None,
         vendor_id=str(inv.vendor_id),
+        vendor_name=vendor_name or None,
         status=inv.status,
         invoice_date=inv.invoice_date.isoformat() if inv.invoice_date else "",
         due_date=inv.due_date.isoformat() if inv.due_date else None,
@@ -77,7 +79,7 @@ async def list_invoices(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    q = select(Invoice)
+    q = select(Invoice, Vendor.legal_name).join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
     count_q = select(func.count(Invoice.id))
 
     scoped_vendor_id = None
@@ -108,12 +110,12 @@ async def list_invoices(
     result = await db.execute(
         q.order_by(Invoice.created_at.desc()).offset((page - 1) * limit).limit(limit)
     )
-    invoices = result.scalars().all()
+    rows = result.all()
 
     items = []
-    for inv in invoices:
+    for inv, vendor_name in rows:
         line_items = await _get_line_items(db, inv.id)
-        items.append(_to_response(inv, line_items))
+        items.append(_to_response(inv, line_items, vendor_name=vendor_name or ""))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -124,13 +126,18 @@ async def get_invoice(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
-    inv = result.scalar_one_or_none()
-    if not inv:
+    result = await db.execute(
+        select(Invoice, Vendor.legal_name)
+        .join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
+        .where(Invoice.id == invoice_id)
+    )
+    row = result.one_or_none()
+    if not row:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    inv, vendor_name = row
 
     line_items = await _get_line_items(db, inv.id)
-    return _to_response(inv, line_items)
+    return _to_response(inv, line_items, vendor_name=vendor_name or "")
 
 
 @router.post("", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)

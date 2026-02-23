@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -22,6 +22,8 @@ from api.schemas.vendor import (
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
 from api.services.auth_service import hash_password
+from api.services.email_service import send_email
+from api.config import settings
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -166,6 +168,7 @@ async def get_vendor(
 @router.post("", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
 async def create_vendor(
     body: VendorCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -246,6 +249,21 @@ async def create_vendor(
         after_state={"status": vendor.status},
         actor_email=current_user.get("email"),
     )
+
+    if existing_user is None:
+        background_tasks.add_task(
+            send_email,
+            to_emails=[body.email],
+            subject=f"Welcome to {settings.APP_NAME} — Your Vendor Account",
+            html_content=(
+                f"<h2>Welcome to {settings.APP_NAME}!</h2>"
+                f"<p>Your vendor account has been created by our procurement team.</p>"
+                f"<p><strong>Login Email:</strong> {body.email}<br>"
+                f"<strong>Temporary Password:</strong> {DEFAULT_VENDOR_PASSWORD}</p>"
+                f"<p>Please log in and change your password immediately.</p>"
+                f"<p>If you have any questions, contact your procurement point of contact.</p>"
+            ),
+        )
 
     return _to_response(vendor)
 

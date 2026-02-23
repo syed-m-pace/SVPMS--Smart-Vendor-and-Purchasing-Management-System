@@ -150,5 +150,9 @@ async def process_invoice_ocr(invoice_id: str, tenant_id: str):
                     if inv:
                         inv.ocr_status = "FAILED"
                         await err_session.commit()
-            except Exception:
-                pass
+            except Exception as recovery_err:
+                logger.error(
+                    "ocr_failed_recovery",
+                    invoice_id=invoice_id,
+                    error=str(recovery_err),
+                )
