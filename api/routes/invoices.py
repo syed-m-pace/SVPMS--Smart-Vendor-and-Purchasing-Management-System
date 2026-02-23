@@ -36,12 +36,13 @@ def _line_to_response(li: InvoiceLineItem) -> InvoiceLineItemResponse:
     )
 
 
-def _to_response(inv: Invoice, line_items: list[InvoiceLineItem], vendor_name: str = "") -> InvoiceResponse:
+def _to_response(inv: Invoice, line_items: list[InvoiceLineItem], vendor_name: str = "", po_number: str = "") -> InvoiceResponse:
     return InvoiceResponse(
         id=str(inv.id),
         tenant_id=str(inv.tenant_id),
         invoice_number=inv.invoice_number,
         po_id=str(inv.po_id) if inv.po_id else None,
+        po_number=po_number or None,
         vendor_id=str(inv.vendor_id),
         vendor_name=vendor_name or None,
         status=inv.status,
@@ -79,7 +80,11 @@ async def list_invoices(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    q = select(Invoice, Vendor.legal_name).join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
+    q = (
+        select(Invoice, Vendor.legal_name, PurchaseOrder.po_number)
+        .join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
+        .join(PurchaseOrder, Invoice.po_id == PurchaseOrder.id, isouter=True)
+    )
     count_q = select(func.count(Invoice.id))
 
     scoped_vendor_id = None
@@ -113,9 +118,9 @@ async def list_invoices(
     rows = result.all()
 
     items = []
-    for inv, vendor_name in rows:
+    for inv, vendor_name, po_number in rows:
         line_items = await _get_line_items(db, inv.id)
-        items.append(_to_response(inv, line_items, vendor_name=vendor_name or ""))
+        items.append(_to_response(inv, line_items, vendor_name=vendor_name or "", po_number=po_number or ""))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
@@ -127,17 +132,18 @@ async def get_invoice(
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(
-        select(Invoice, Vendor.legal_name)
+        select(Invoice, Vendor.legal_name, PurchaseOrder.po_number)
         .join(Vendor, Invoice.vendor_id == Vendor.id, isouter=True)
+        .join(PurchaseOrder, Invoice.po_id == PurchaseOrder.id, isouter=True)
         .where(Invoice.id == invoice_id)
     )
     row = result.one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    inv, vendor_name = row
+    inv, vendor_name, po_number = row
 
     line_items = await _get_line_items(db, inv.id)
-    return _to_response(inv, line_items, vendor_name=vendor_name or "")
+    return _to_response(inv, line_items, vendor_name=vendor_name or "", po_number=po_number or "")
 
 
 @router.post("", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)

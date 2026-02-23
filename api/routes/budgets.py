@@ -71,11 +71,6 @@ async def list_budgets(
         q = q.where(Budget.quarter == quarter)
         count_q = count_q.where(Budget.quarter == quarter)
 
-    # Manager: restrict to own department
-    if current_user["role"] == "manager" and current_user.get("department_id"):
-        q = q.where(Budget.department_id == current_user["department_id"])
-        count_q = count_q.where(Budget.department_id == current_user["department_id"])
-
     total = (await db.execute(count_q)).scalar() or 0
     result = await db.execute(
         q.order_by(Budget.fiscal_year.desc(), Budget.quarter.desc())

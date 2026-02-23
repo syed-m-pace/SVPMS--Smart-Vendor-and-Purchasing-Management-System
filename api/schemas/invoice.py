@@ -34,6 +34,7 @@ class InvoiceResponse(BaseModel):
     tenant_id: str
     invoice_number: str
     po_id: Optional[str] = None
+    po_number: Optional[str] = None
     vendor_id: str
     vendor_name: Optional[str] = None
     status: str
