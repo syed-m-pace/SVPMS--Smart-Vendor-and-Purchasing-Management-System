@@ -87,8 +87,8 @@ async def _get_line_items(db: AsyncSession, pr_id) -> list[PrLineItem]:
 
 @router.get("", response_model=PaginatedResponse[PurchaseRequestResponse])
 async def list_purchase_requests(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     pr_status: str = Query(None, alias="status"),
     department_id: str = Query(None),
     requester_id: str = Query(None),

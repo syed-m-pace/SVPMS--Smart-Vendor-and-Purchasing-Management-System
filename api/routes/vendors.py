@@ -86,8 +86,8 @@ async def _resolve_vendor_for_user(
 
 @router.get("", response_model=PaginatedResponse[VendorResponse])
 async def list_vendors(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     vendor_status: str = Query(None, alias="status"),
     search: str = Query(None),
     current_user: dict = Depends(get_current_user),

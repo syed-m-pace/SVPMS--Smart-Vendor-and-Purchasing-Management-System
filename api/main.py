@@ -1,12 +1,19 @@
-from fastapi import FastAPI
+import asyncio
+from fastapi import FastAPI, Depends, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from api.config import settings
-from api.database import init_db, close_db
+from api.database import init_db, close_db, get_db
 from api.logging_config import setup_logging
 from api.services.firebase_push import init_firebase
+from api.services.cache import cache
+from api.services.storage import r2_client
+from api.middleware.correlation import CorrelationIdMiddleware
 
 # Import models so they are registered with Base.metadata
 import api.models  # noqa: F401
@@ -36,19 +43,52 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Requested-With", "X-Request-ID"],
 )
 
 
 @app.get("/health", tags=["System"])
-async def health():
-    return {"status": "healthy", "version": settings.APP_VERSION}
+async def health(response: Response, db: AsyncSession = Depends(get_db)):
+    health_status = {"status": "healthy", "version": settings.APP_VERSION, "checks": {}}
+    
+    # 1. Check DB
+    try:
+        await db.execute(text("SELECT 1"))
+        health_status["checks"]["db"] = "ok"
+    except Exception as e:
+        logger.error("health_check_db_failed", error=str(e))
+        health_status["checks"]["db"] = "error"
+        health_status["status"] = "unhealthy"
+        
+    # 2. Check Redis
+    try:
+        await cache.ping()
+        health_status["checks"]["redis"] = "ok"
+    except Exception as e:
+        logger.error("health_check_redis_failed", error=str(e))
+        health_status["checks"]["redis"] = "error"
+        health_status["status"] = "unhealthy"
+        
+    # 3. Check R2
+    try:
+        await asyncio.to_thread(r2_client.s3.head_bucket, Bucket=r2_client.bucket)
+        health_status["checks"]["r2"] = "ok"
+    except Exception as e:
+        logger.error("health_check_r2_failed", error=str(e))
+        health_status["checks"]["r2"] = "error"
+        health_status["status"] = "unhealthy"
+
+    if health_status["status"] == "unhealthy":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return health_status
 
 
 # --- Routers ---

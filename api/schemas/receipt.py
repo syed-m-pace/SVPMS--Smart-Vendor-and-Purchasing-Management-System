@@ -12,6 +12,7 @@ class ReceiptLineItemCreate(BaseModel):
 class ReceiptCreate(BaseModel):
     po_id: str
     notes: Optional[str] = None
+    document_key: Optional[str] = None
     line_items: List[ReceiptLineItemCreate] = Field(..., min_length=1)
 
 
@@ -34,6 +35,7 @@ class ReceiptResponse(BaseModel):
     receipt_date: str
     status: str
     notes: Optional[str] = None
+    document_key: Optional[str] = None
     line_items: List[ReceiptLineItemResponse] = []
     created_at: str
 

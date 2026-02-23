@@ -50,6 +50,7 @@ def _to_response(r: Receipt, line_items: list[ReceiptLineItem]) -> ReceiptRespon
         receipt_date=r.receipt_date.isoformat() if r.receipt_date else "",
         status=r.status,
         notes=r.notes,
+        document_key=r.document_key,
         line_items=[_line_to_response(li) for li in line_items],
         created_at=r.created_at.isoformat() if r.created_at else "",
     )
@@ -64,8 +65,8 @@ async def _get_line_items(db: AsyncSession, receipt_id) -> list[ReceiptLineItem]
 
 @router.get("", response_model=PaginatedResponse[ReceiptResponse])
 async def list_receipts(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     po_id: str = Query(None),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -172,6 +173,7 @@ async def create_receipt(
         receipt_date=date_type.today(),
         status="CONFIRMED",
         notes=body.notes,
+        document_key=body.document_key,
     )
     db.add(receipt)
     await db.flush()

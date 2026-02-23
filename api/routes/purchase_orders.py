@@ -113,8 +113,8 @@ async def _resolve_vendor_for_user(
 
 @router.get("", response_model=PaginatedResponse[PurchaseOrderResponse])
 async def list_purchase_orders(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     po_status: str = Query(None, alias="status"),
     vendor_id: str = Query(None),
     pr_id: str = Query(None),
@@ -179,8 +179,8 @@ async def list_purchase_orders(
 
 @router.get("/ready", response_model=PaginatedResponse[PurchaseOrderReadyResponse])
 async def list_ready_purchase_orders(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(
         require_roles(

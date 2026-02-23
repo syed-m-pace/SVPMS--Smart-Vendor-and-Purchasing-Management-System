@@ -50,8 +50,8 @@ def _to_response(b: Budget) -> BudgetResponse:
 
 @router.get("", response_model=PaginatedResponse[BudgetResponse])
 async def list_budgets(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     department_id: str = Query(None),
     fiscal_year: int = Query(None),
     quarter: int = Query(None, ge=1, le=4),
@@ -140,7 +140,12 @@ async def update_budget(
     _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget_id))
+    result = await db.execute(
+        select(Budget)
+        .options(joinedload(Budget.department))
+        .where(Budget.id == budget_id)
+        .with_for_update(of=Budget)
+    )
     budget = result.scalar_one_or_none()
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")

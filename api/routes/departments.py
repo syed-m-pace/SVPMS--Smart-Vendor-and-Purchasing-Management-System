@@ -25,7 +25,7 @@ def _to_response(d: Department) -> DepartmentResponse:
 
 @router.get("", response_model=PaginatedResponse[DepartmentResponse])
 async def list_departments(
-    page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000), limit: int = Query(20, ge=1, le=50),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):

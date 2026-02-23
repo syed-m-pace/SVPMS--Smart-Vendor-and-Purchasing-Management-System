@@ -76,8 +76,8 @@ async def _get_line_items(db: AsyncSession, invoice_id) -> list[InvoiceLineItem]
 
 @router.get("", response_model=PaginatedResponse[InvoiceResponse])
 async def list_invoices(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1, le=1000),
+    limit: int = Query(20, ge=1, le=50),
     inv_status: str = Query(None, alias="status"),
     vendor_id: str = Query(None),
     po_id: str = Query(None),

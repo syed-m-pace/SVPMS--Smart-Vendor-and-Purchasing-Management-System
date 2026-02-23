@@ -39,6 +39,7 @@ class Receipt(Base):
     receipt_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="DRAFT")
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    document_key: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow
     )
