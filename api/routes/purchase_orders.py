@@ -154,11 +154,25 @@ async def list_purchase_orders(
     )
     rows = result.all()
 
+    # Batch load all line items in a single query to avoid N+1
+    po_ids = [row[0].id for row in rows]
+    if po_ids:
+        li_result = await db.execute(
+            select(PoLineItem)
+            .where(PoLineItem.po_id.in_(po_ids))
+            .order_by(PoLineItem.po_id, PoLineItem.line_number)
+        )
+        all_line_items = li_result.scalars().all()
+        li_map: dict = {}
+        for li in all_line_items:
+            li_map.setdefault(str(li.po_id), []).append(li)
+    else:
+        li_map = {}
+
     items = []
     for row in rows:
         po, vendor_name = row[0], row[1]
-        line_items = await _get_line_items(db, po.id)
-        items.append(_to_response(po, line_items, vendor_name=vendor_name))
+        items.append(_to_response(po, li_map.get(str(po.id), []), vendor_name=vendor_name))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 

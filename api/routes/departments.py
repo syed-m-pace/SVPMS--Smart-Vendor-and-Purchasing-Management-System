@@ -63,7 +63,6 @@ async def create_department(
     )
     db.add(dept)
     await db.flush()
-    await db.commit()
     await db.refresh(dept)
     return _to_response(dept)
 
@@ -81,7 +80,7 @@ async def update_department(
         raise HTTPException(status_code=404, detail="Department not found")
     for field, val in body.model_dump(exclude_unset=True).items():
         setattr(dept, field, val)
-    await db.commit()
+    await db.flush()
     await db.refresh(dept)
     return _to_response(dept)
 
@@ -98,4 +97,4 @@ async def delete_department(
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
     await db.delete(dept)
-    await db.commit()
+    await db.flush()

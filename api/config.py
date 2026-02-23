@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "SVPMS"
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     PORT: int = 8000
 
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     EMAIL_FROM_ADDRESS: str = "noreply@svpms.example.com"
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    INTERNAL_JOB_SECRET: Optional[str] = None  # Required in production for /internal/jobs/* auth
     CORS_ORIGINS: str = "http://localhost:3000"
     CORS_ORIGIN_REGEX: Optional[str] = None
 

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
 from api.middleware.auth import get_current_user
+from api.middleware.authorization import check_self_approval
 from api.middleware.tenant import get_db_with_tenant
 from api.models.approval import Approval
 from api.models.purchase_request import PurchaseRequest
@@ -133,6 +134,15 @@ async def approve_step(
     if not approval:
         raise HTTPException(status_code=404, detail="Approval not found")
 
+    # Self-approval guard: prevent approving your own PR
+    if approval.entity_type in ("PurchaseRequest", "PR"):
+        pr_result = await db.execute(
+            select(PurchaseRequest).where(PurchaseRequest.id == approval.entity_id)
+        )
+        pr = pr_result.scalar_one_or_none()
+        if pr:
+            check_self_approval(current_user["user_id"], str(pr.requester_id))
+
     approval_result = await process_approval(
         db,
         approval.entity_type,
@@ -165,7 +175,7 @@ async def approve_step(
         actor_email=current_user.get("email"),
     )
 
-    await db.commit()
+    await db.flush()
 
     # Refresh and return
     await db.refresh(approval)
@@ -185,6 +195,15 @@ async def reject_step(
     approval = result.scalar_one_or_none()
     if not approval:
         raise HTTPException(status_code=404, detail="Approval not found")
+
+    # Self-rejection guard: prevent rejecting your own PR
+    if approval.entity_type in ("PurchaseRequest", "PR"):
+        pr_result = await db.execute(
+            select(PurchaseRequest).where(PurchaseRequest.id == approval.entity_id)
+        )
+        pr = pr_result.scalar_one_or_none()
+        if pr:
+            check_self_approval(current_user["user_id"], str(pr.requester_id))
 
     await process_approval(
         db,
@@ -219,7 +238,7 @@ async def reject_step(
         actor_email=current_user.get("email"),
     )
 
-    await db.commit()
+    await db.flush()
 
     await db.refresh(approval)
     enriched = await _enrich_approval(db, approval)

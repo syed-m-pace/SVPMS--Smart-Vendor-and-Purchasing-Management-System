@@ -11,7 +11,7 @@ Jobs:
 
 from datetime import datetime, timedelta, date
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
@@ -27,13 +27,25 @@ router = APIRouter()
 async def _require_internal_auth(request: Request):
     """
     Verify request comes from Cloud Scheduler or internal service.
-    In production, checks OIDC token. In dev, accepts any request.
+    Validates X-Internal-Secret header against INTERNAL_JOB_SECRET from settings.
     """
-    # In production, validate Cloud Scheduler OIDC token:
-    # auth_header = request.headers.get("Authorization")
-    # if not auth_header: raise HTTPException(403)
-    # Verify OIDC token...
-    pass
+    from api.config import settings
+    secret = settings.INTERNAL_JOB_SECRET
+    if not secret:
+        # In development (DEBUG=True), allow unauthenticated internal calls
+        if settings.DEBUG:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="INTERNAL_JOB_SECRET is not configured",
+        )
+    provided = request.headers.get("X-Internal-Secret")
+    if not provided or provided != secret:
+        logger.warning("internal_auth_failed", path=request.url.path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
 
 
 @router.post("/check-document-expiry")

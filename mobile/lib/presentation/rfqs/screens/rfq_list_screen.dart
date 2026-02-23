@@ -106,7 +106,9 @@ class _RFQListScreenState extends State<RFQListScreen> {
                           onTap: () {
                             if (hasWonPo) {
                               // Winner: go directly to the awarded PO
-                              context.push('/purchase-orders/${rfq.awardedPoId}');
+                              context.push(
+                                '/purchase-orders/${rfq.awardedPoId}',
+                              );
                             } else if (!isAwarded) {
                               // Open: go to bid screen
                               context.push('/rfqs/${rfq.id}/bid');
@@ -145,7 +147,9 @@ class _RFQListScreenState extends State<RFQListScreen> {
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.success.withValues(alpha: 0.15),
+                                        color: AppColors.success.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
@@ -164,7 +168,9 @@ class _RFQListScreenState extends State<RFQListScreen> {
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.success.withValues(alpha: 0.1),
+                                        color: AppColors.success.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
@@ -180,16 +186,9 @@ class _RFQListScreenState extends State<RFQListScreen> {
                               ),
                             ],
                           ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              StatusBadge(status: rfq.status),
-                              if (!isAwarded)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 4),
-                                  child: Icon(Icons.chevron_right, size: 16),
-                                ),
-                            ],
+                          trailing: Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: StatusBadge(status: rfq.status),
                           ),
                           isThreeLine: true,
                         ),

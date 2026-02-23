@@ -61,12 +61,22 @@ async def upload_file(
     }
 
 
+def _assert_tenant_owns_file(file_key: str, tenant_id: str) -> None:
+    """Verify the file key belongs to the requesting tenant."""
+    if not file_key.startswith(f"{tenant_id}/"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+
 @router.get("/{file_key:path}")
 async def get_file_url(
     file_key: str,
     current_user: dict = Depends(get_current_user),
 ):
     """Get a presigned download URL for an existing file."""
+    _assert_tenant_owns_file(file_key, current_user["tenant_id"])
     try:
         presigned_url = r2_client.get_presigned_url(file_key)
     except Exception as e:
@@ -82,6 +92,7 @@ async def delete_file(
     current_user: dict = Depends(get_current_user),
 ):
     """Delete a file from R2 storage."""
+    _assert_tenant_owns_file(file_key, current_user["tenant_id"])
     try:
         r2_client.delete(file_key)
     except Exception as e:

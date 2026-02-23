@@ -101,14 +101,8 @@ async def list_purchase_requests(
     count_q = select(func.count(PurchaseRequest.id)).where(PurchaseRequest.deleted_at == None)  # noqa: E711
 
     if pr_status:
-        # DBG: Print status filter
-        print(f"DEBUG: Filtering by status: '{pr_status}' (Type: {type(pr_status)})")
         q = q.where(PurchaseRequest.status == pr_status)
         count_q = count_q.where(PurchaseRequest.status == pr_status)
-    else:
-        print("DEBUG: No status filter applied")
-    
-    # ... (rest of filtering) ...
 
     if department_id:
         q = q.where(PurchaseRequest.department_id == department_id)
@@ -179,10 +173,24 @@ async def list_purchase_requests(
     prs = result.scalars().all()
     logger.info("pr_list_result", count=len(prs), total=total)
 
+    # Batch load all line items in a single query to avoid N+1
+    pr_ids = [pr.id for pr in prs]
+    if pr_ids:
+        li_result = await db.execute(
+            select(PrLineItem)
+            .where(PrLineItem.pr_id.in_(pr_ids))
+            .order_by(PrLineItem.pr_id, PrLineItem.line_number)
+        )
+        all_line_items = li_result.scalars().all()
+        li_map: dict = {}
+        for li in all_line_items:
+            li_map.setdefault(str(li.pr_id), []).append(li)
+    else:
+        li_map = {}
+
     items = []
     for pr in prs:
-        line_items = await _get_line_items(db, pr.id)
-        items.append(_to_response(pr, line_items))
+        items.append(_to_response(pr, li_map.get(str(pr.id), [])))
 
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 

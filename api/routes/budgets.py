@@ -126,8 +126,7 @@ async def create_budget(
     )
     db.add(budget)
     await db.flush()
-    await db.commit()
-    
+
     result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget.id))
     budget_with_dept = result.scalar_one()
     return _to_response(budget_with_dept)
@@ -154,8 +153,8 @@ async def update_budget(
             )
         budget.total_cents = body.total_cents
 
-    await db.commit()
-    
+    await db.flush()
+
     result = await db.execute(select(Budget).options(joinedload(Budget.department)).where(Budget.id == budget.id))
     budget_with_dept = result.scalar_one()
     return _to_response(budget_with_dept)

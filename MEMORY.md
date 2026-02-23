@@ -25,6 +25,7 @@
 - Phase 3: Core Entities CRUD **COMPLETE** (32 API paths, 9 routers: departments, users, budgets, vendors, PRs, POs, receipts, invoices, RFQs)
 - Phase 4: Business Logic **COMPLETE** (34 API paths, approval chains, budget locking, audit logging, notifications)
 - Phase 4 Bug Fixes **COMPLETE** (4 bugs fixed — push WouldBlock, invoice vendor_name, OCR logging, vendor onboarding email, mobile blank screen)
+- **Production Hardening COMPLETE** (20 critical/high issues fixed): DEBUG=False, random vendor password, internal job auth, file tenant isolation, OCR async, rate limit X-Forwarded-For, CORS methods restricted, self-approval bypass fixed, N+1 queries fixed, all explicit db.commit() → db.flush()
 - Phase 5-9: Not started
 
 ## Post-Launch Bug Fixes (Phase 4)
@@ -39,6 +40,20 @@
 - Vendor bank_account_number: now saved as `bank_account_number_encrypted`
 - Seed vendor user email: changed to `sales@alphasupplies.com` to match vendor record
 - PR approve/reject: implemented
+
+## RFQ Award Flow
+- `POST /rfqs/{rfq_id}/award` with `{"bid_id": "..."}` — creates PO from bid, no PR required
+- PO line items sourced from RFQ line items; bid.total_cents distributed by qty across lines
+- RFQ status → AWARDED; PO.pr_id may be null (RFQ-sourced POs)
+- Sends FCM push + email ("po_awarded" template) to winning vendor on award
+- Frontend: `rfqService.award(rfqId, bidId)` → removed old `pr_id` guard
+- Bug fixed: RFQ create used `"notification"` template (missing) → changed to `"rfq_issued"`
+
+## Notification Templates (api/services/notification_service.py)
+- `rfq_issued`: vendor notified when RFQ is created
+- `po_issued`: vendor notified when PO is manually created
+- `po_awarded`: vendor notified when RFQ bid is awarded (new)
+- `pr_approval_request`, `pr_approved`, `pr_rejected`, `invoice_exception`: existing
 
 ## Phase 4 Architecture Decisions
 - **Budget locking**: SELECT FOR UPDATE on budget row, sum COMMITTED reservations, single atomic transaction via get_db()

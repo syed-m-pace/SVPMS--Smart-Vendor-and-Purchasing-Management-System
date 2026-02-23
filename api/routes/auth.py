@@ -53,7 +53,7 @@ async def change_password(
         )
 
     user.password_hash = hash_password(body.new_password)
-    await db.commit()
+    await db.flush()
 
     logger.info("password_changed", user_id=str(user.id))
 
@@ -97,7 +97,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     # Update last_login_at (naive UTC to match TIMESTAMP WITHOUT TIME ZONE column)
     user.last_login_at = datetime.utcnow()
-    await db.commit()
+    await db.flush()
 
     access_token = create_access_token(
         user_id=str(user.id),
@@ -245,8 +245,6 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     )
     db.add(user)
     await db.flush()
-
-    await db.commit()
 
     access_token = create_access_token(
         user_id=str(user.id),

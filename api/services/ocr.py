@@ -1,4 +1,6 @@
 # api/services/ocr.py
+import asyncio
+from functools import partial
 from google.cloud import documentai_v1 as documentai
 from api.config import settings
 import structlog
@@ -69,3 +71,11 @@ def extract_invoice_data(file_bytes: bytes, mime_type: str = "application/pdf") 
         mime_type=mime_type,
     )
     return fields
+
+
+async def extract_invoice_data_async(file_bytes: bytes, mime_type: str = "application/pdf") -> dict:
+    """Async wrapper for extract_invoice_data — runs sync Document AI call in thread pool."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, partial(extract_invoice_data, file_bytes, mime_type)
+    )

@@ -35,7 +35,13 @@ async def rate_limit_middleware(request: Request, call_next):
     if request.url.path == "/health":
         return await call_next(request)
 
-    client_ip = request.client.host if request.client else "unknown"
+    # Use X-Forwarded-For when running behind a reverse proxy (Cloud Run, etc.)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # Take the first IP in the chain (the original client)
+        client_ip = forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
     config = _get_limit_config(request.url.path)
     limit = config["limit"]
     window = config["window"]

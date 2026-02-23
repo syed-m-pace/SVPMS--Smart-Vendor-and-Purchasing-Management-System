@@ -192,7 +192,7 @@ async def create_receipt(
     else:
         po.status = "PARTIALLY_FULFILLED"
 
-    await db.commit()
+    await db.flush()
     await db.refresh(receipt)
     line_items = await _get_line_items(db, receipt.id)
     logger.info("receipt_created", receipt_id=str(receipt.id), po_id=str(po.id))

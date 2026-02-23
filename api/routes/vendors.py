@@ -1,3 +1,5 @@
+import secrets
+import string
 from datetime import datetime
 from typing import Optional
 
@@ -28,7 +30,20 @@ from api.config import settings
 logger = structlog.get_logger()
 router = APIRouter()
 
-DEFAULT_VENDOR_PASSWORD = "SvpmsTest123!"
+
+def _generate_vendor_password() -> str:
+    """Generate a secure random temporary password for new vendor accounts."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(16))
+        # Ensure at least one of each required character class
+        if (
+            any(c.isupper() for c in pwd)
+            and any(c.islower() for c in pwd)
+            and any(c.isdigit() for c in pwd)
+            and any(c in "!@#$%^&*" for c in pwd)
+        ):
+            return pwd
 
 
 def _to_response(v: Vendor) -> VendorResponse:
@@ -220,11 +235,12 @@ async def create_vendor(
     )
     db.add(vendor)
 
+    temp_password = _generate_vendor_password()
     if existing_user is None:
         user = User(
             tenant_id=current_user["tenant_id"],
             email=body.email,
-            password_hash=hash_password(DEFAULT_VENDOR_PASSWORD),
+            password_hash=hash_password(temp_password),
             first_name=body.legal_name,
             last_name="Vendor",
             role="vendor",
@@ -234,7 +250,7 @@ async def create_vendor(
     else:
         existing_user.is_active = True
         if not existing_user.password_hash:
-            existing_user.password_hash = hash_password(DEFAULT_VENDOR_PASSWORD)
+            existing_user.password_hash = hash_password(temp_password)
 
     await db.flush()
 
@@ -259,7 +275,7 @@ async def create_vendor(
                 f"<h2>Welcome to {settings.APP_NAME}!</h2>"
                 f"<p>Your vendor account has been created by our procurement team.</p>"
                 f"<p><strong>Login Email:</strong> {body.email}<br>"
-                f"<strong>Temporary Password:</strong> {DEFAULT_VENDOR_PASSWORD}</p>"
+                f"<strong>Temporary Password:</strong> {temp_password}</p>"
                 f"<p>Please log in and change your password immediately.</p>"
                 f"<p>If you have any questions, contact your procurement point of contact.</p>"
             ),

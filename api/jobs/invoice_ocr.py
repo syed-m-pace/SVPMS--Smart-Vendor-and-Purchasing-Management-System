@@ -14,7 +14,7 @@ from api.database import AsyncSessionLocal, set_tenant_context
 from api.models.invoice import Invoice
 from api.services.ocr import (
     SUPPORTED_MIME_TYPES,
-    extract_invoice_data,
+    extract_invoice_data_async,
     infer_mime_type_from_key,
 )
 from api.services.storage import r2_client
@@ -80,8 +80,8 @@ async def process_invoice_ocr(invoice_id: str, tenant_id: str):
                 await session.commit()
                 return
 
-            # 3. Run Google Document AI
-            ocr_data = extract_invoice_data(file_bytes, mime_type=mime_type)
+            # 3. Run Google Document AI (non-blocking — runs in thread pool)
+            ocr_data = await extract_invoice_data_async(file_bytes, mime_type=mime_type)
 
             if not ocr_data:
                 logger.warning("ocr_no_data_extracted", invoice_id=invoice_id)
