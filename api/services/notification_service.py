@@ -65,6 +65,26 @@ TEMPLATES = {
             "and requires review.</p>"
         ),
     },
+    "rfq_issued": {
+        "subject": "[SVPMS] New Request for Quotation — {rfq_number}",
+        "html": (
+            "<h2>New Request for Quotation</h2>"
+            "<p>A new RFQ <strong>{rfq_number}</strong> has been issued: <em>{title}</em>.</p>"
+            "<p><strong>Submission Deadline:</strong> {deadline}</p>"
+            "<p>Please log in to the SVPMS Vendor App to view the details and submit your bid.</p>"
+        ),
+    },
+    "po_awarded": {
+        "subject": "[SVPMS] Congratulations — Your bid on {rfq_number} has been selected!",
+        "html": (
+            "<h2>Bid Awarded</h2>"
+            "<p>Dear <strong>{vendor_name}</strong>,</p>"
+            "<p>Your bid on RFQ <strong>{rfq_number}</strong> has been selected.</p>"
+            "<p>Purchase Order <strong>{po_number}</strong> has been issued to your account.</p>"
+            "<p><strong>Amount:</strong> {currency} {amount_display}</p>"
+            "<p>Please log in to the SVPMS Vendor App to acknowledge the PO and confirm delivery details.</p>"
+        ),
+    },
 }
 
 

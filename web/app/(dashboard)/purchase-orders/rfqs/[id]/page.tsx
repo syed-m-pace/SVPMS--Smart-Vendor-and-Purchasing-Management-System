@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatCurrency, formatDate, timeAgo } from "@/lib/utils";
 import { rfqService } from "@/lib/api/rfqs";
-import { poService } from "@/lib/api/purchase-orders";
 import { vendorService } from "@/lib/api/vendors";
 import type { RFQ, RFQBid, Vendor } from "@/types/models";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -75,17 +74,10 @@ export default function RfqDetailsPage() {
     }, [rfqId]);
 
     const handleAward = async (bid: RFQBid) => {
-        if (!rfq?.pr_id) {
-            toast.error("Original PR is missing from this RFQ");
-            return;
-        }
-
+        if (!rfq) return;
         setAwarding(bid.id);
         try {
-            const po = await poService.create({
-                pr_id: rfq.pr_id,
-                vendor_id: bid.vendor_id,
-            });
+            const po = await rfqService.award(rfq.id, bid.id);
             toast.success(`Successfully awarded PO to ${vendors[bid.vendor_id]?.legal_name || "vendor"}: ${po.po_number}`);
             router.push(`/purchase-orders/${po.id}`);
         } catch (error) {

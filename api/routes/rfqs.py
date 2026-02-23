@@ -11,6 +11,7 @@ from api.middleware.authorization import require_roles
 from api.models.rfq import Rfq, RfqLineItem, RfqBid
 from api.models.vendor import Vendor
 from api.models.user import User
+from api.models.purchase_order import PurchaseOrder, PoLineItem
 from api.services.notification_service import send_notification
 from api.services.push_service import send_push
 from api.schemas.rfq import (
@@ -19,7 +20,9 @@ from api.schemas.rfq import (
     RfqLineItemResponse,
     RfqBidCreate,
     RfqBidResponse,
+    RfqAwardRequest,
 )
+from api.schemas.purchase_order import PurchaseOrderResponse, PoLineItemResponse
 from api.schemas.common import PaginatedResponse, build_pagination
 
 logger = structlog.get_logger()
@@ -213,11 +216,12 @@ async def create_rfq(
             
             background_tasks.add_task(
                 send_notification,
-                "notification", # fallback template if rfq_issued doesn't exist
+                "rfq_issued",
                 [vendor.email],
                 {
+                    "rfq_number": rfq.rfq_number,
                     "title": rfq.title,
-                    "body": f"A new Request for Quotation ({rfq.rfq_number}) has been issued. Deadline: {rfq.deadline}",
+                    "deadline": rfq.deadline.strftime("%d %b %Y %H:%M UTC") if rfq.deadline else "—",
                 },
             )
         except Exception as exc:
@@ -333,3 +337,176 @@ async def list_bids(
         select(RfqBid).where(RfqBid.rfq_id == rfq_id).order_by(RfqBid.total_cents)
     )
     return [_bid_to_response(b) for b in bids_result.scalars().all()]
+
+
+@router.post("/{rfq_id}/award", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED)
+async def award_rfq(
+    rfq_id: str,
+    body: RfqAwardRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """Award an RFQ to the selected bid, creating a PO for the winning vendor."""
+    rfq_result = await db.execute(select(Rfq).where(Rfq.id == rfq_id))
+    rfq = rfq_result.scalar_one_or_none()
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    if rfq.status not in ("OPEN", "CLOSED"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot award an RFQ in '{rfq.status}' status",
+        )
+
+    bid_result = await db.execute(
+        select(RfqBid).where(RfqBid.id == body.bid_id, RfqBid.rfq_id == rfq.id)
+    )
+    bid = bid_result.scalar_one_or_none()
+    if not bid:
+        raise HTTPException(status_code=404, detail="Bid not found for this RFQ")
+
+    vendor_result = await db.execute(
+        select(Vendor).where(Vendor.id == bid.vendor_id, Vendor.deleted_at == None)  # noqa: E711
+    )
+    vendor = vendor_result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    if vendor.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vendor must be ACTIVE to receive a PO",
+        )
+
+    # Generate PO number
+    po_count = (await db.execute(select(func.count(PurchaseOrder.id)))).scalar() or 0
+    po_number = f"PO-{(po_count + 1):06d}"
+
+    po = PurchaseOrder(
+        tenant_id=current_user["tenant_id"],
+        po_number=po_number,
+        pr_id=rfq.pr_id,  # may be None — RFQ-sourced POs don't require a PR
+        vendor_id=vendor.id,
+        status="ISSUED",
+        issued_at=datetime.utcnow(),
+        total_cents=bid.total_cents,
+        currency="INR",
+    )
+    db.add(po)
+    await db.flush()
+
+    # Build PO line items from RFQ line items, distributing bid total by quantity
+    rfq_lines_result = await db.execute(
+        select(RfqLineItem).where(RfqLineItem.rfq_id == rfq.id).order_by(RfqLineItem.id)
+    )
+    rfq_lines = list(rfq_lines_result.scalars().all())
+
+    if rfq_lines:
+        total_qty = sum(li.quantity for li in rfq_lines)
+        allocated = 0
+        for idx, li in enumerate(rfq_lines):
+            if idx == len(rfq_lines) - 1:
+                remaining = bid.total_cents - allocated
+                unit_price = max(1, remaining // li.quantity)
+            else:
+                unit_price = max(1, bid.total_cents // total_qty)
+                allocated += unit_price * li.quantity
+            db.add(PoLineItem(
+                po_id=po.id,
+                line_number=idx + 1,
+                description=li.description,
+                quantity=li.quantity,
+                unit_price_cents=unit_price,
+                received_quantity=0,
+            ))
+    else:
+        db.add(PoLineItem(
+            po_id=po.id,
+            line_number=1,
+            description=rfq.title,
+            quantity=1,
+            unit_price_cents=bid.total_cents,
+            received_quantity=0,
+        ))
+
+    rfq.status = "AWARDED"
+    await db.flush()
+
+    # Fetch line items for response
+    po_lines_result = await db.execute(
+        select(PoLineItem).where(PoLineItem.po_id == po.id).order_by(PoLineItem.line_number)
+    )
+    po_line_items = list(po_lines_result.scalars().all())
+
+    # Notify winning vendor — FCM push + email
+    try:
+        vendor_user_ids_result = await db.execute(
+            select(User.id).where(
+                User.email == vendor.email,
+                User.role == "vendor",
+                User.is_active == True,  # noqa: E712
+                User.deleted_at == None,  # noqa: E711
+            )
+        )
+        vendor_user_ids = [str(row[0]) for row in vendor_user_ids_result.all()]
+        if vendor_user_ids:
+            await send_push(
+                db,
+                user_ids=vendor_user_ids,
+                title="Congratulations! Your bid was selected",
+                body=f"Your bid on {rfq.rfq_number} won. PO {po_number} has been issued to you.",
+                data={
+                    "type": "RFQ_AWARDED",
+                    "id": str(po.id),
+                    "po_id": str(po.id),
+                    "po_number": po_number,
+                    "rfq_id": str(rfq.id),
+                    "rfq_number": rfq.rfq_number,
+                },
+            )
+
+        background_tasks.add_task(
+            send_notification,
+            "po_awarded",
+            [vendor.email],
+            {
+                "rfq_number": rfq.rfq_number,
+                "po_number": po_number,
+                "currency": "INR",
+                "amount_cents": bid.total_cents,
+                "vendor_name": vendor.legal_name,
+            },
+        )
+    except Exception as exc:
+        logger.error("award_notification_failed", rfq_id=rfq_id, po_id=str(po.id), error=str(exc))
+
+    logger.info("rfq_awarded", rfq_id=rfq_id, bid_id=str(bid.id), po_id=str(po.id), vendor_id=str(vendor.id))
+
+    return PurchaseOrderResponse(
+        id=str(po.id),
+        tenant_id=str(po.tenant_id),
+        po_number=po.po_number,
+        pr_id=str(po.pr_id) if po.pr_id else None,
+        vendor_id=str(po.vendor_id),
+        vendor_name=vendor.legal_name,
+        status=po.status,
+        total_cents=po.total_cents,
+        currency=po.currency,
+        issued_at=po.issued_at.isoformat() if po.issued_at else None,
+        expected_delivery_date=None,
+        terms_and_conditions=None,
+        line_items=[
+            PoLineItemResponse(
+                id=str(li.id),
+                line_number=li.line_number,
+                description=li.description,
+                quantity=li.quantity,
+                unit_price_cents=li.unit_price_cents,
+                received_quantity=li.received_quantity or 0,
+            )
+            for li in po_line_items
+        ],
+        created_at=po.created_at.isoformat() if po.created_at else "",
+        updated_at=po.updated_at.isoformat() if po.updated_at else "",
+    )

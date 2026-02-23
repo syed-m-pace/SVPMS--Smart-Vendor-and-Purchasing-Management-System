@@ -21,6 +21,10 @@ class RfqBidCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class RfqAwardRequest(BaseModel):
+    bid_id: str
+
+
 class RfqLineItemResponse(BaseModel):
     id: str
     description: str
