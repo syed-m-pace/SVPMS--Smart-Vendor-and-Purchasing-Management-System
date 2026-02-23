@@ -224,6 +224,11 @@ class ApiClient {
     return resp.data;
   }
 
+  Future<Map<String, dynamic>> getInvoice(String id) async {
+    final resp = await dio.get('/api/v1/invoices/$id');
+    return resp.data;
+  }
+
   Future<Map<String, dynamic>> createInvoice({
     required String poId,
     required String invoiceNumber,
@@ -239,6 +244,11 @@ class ApiClient {
       if (documentKey != null) 'document_key': documentKey,
     });
     final resp = await dio.post('/api/v1/invoices', data: data);
+    return resp.data;
+  }
+
+  Future<Map<String, dynamic>> getFilePresignedUrl(String fileKey) async {
+    final resp = await dio.get('/api/v1/files/$fileKey');
     return resp.data;
   }
 

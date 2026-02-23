@@ -1,0 +1,618 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+    BarChart,
+    Bar,
+    LineChart,
+    Line,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+} from "recharts";
+import { TrendingUp, Users, CheckCircle, Wallet } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
+import { budgetService } from "@/lib/api/services";
+import { prService } from "@/lib/api/purchase-requests";
+import { poService } from "@/lib/api/purchase-orders";
+import { invoiceService } from "@/lib/api/invoices";
+import { vendorService } from "@/lib/api/vendors";
+import type {
+    Budget,
+    Invoice,
+    Vendor,
+    PurchaseRequest,
+    PurchaseOrder,
+} from "@/types/models";
+
+// ── Palette ────────────────────────────────────────────────────────────────
+const PIE_COLORS = ["#4F46E5", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#F97316"];
+
+const STATUS_COLOR: Record<string, string> = {
+    DRAFT: "#94A3B8",
+    PENDING: "#F59E0B",
+    APPROVED: "#22C55E",
+    REJECTED: "#EF4444",
+    CANCELLED: "#6B7280",
+    UPLOADED: "#F59E0B",
+    MATCHED: "#22C55E",
+    EXCEPTION: "#EF4444",
+    DISPUTED: "#F97316",
+    PAID: "#8B5CF6",
+    ACTIVE: "#22C55E",
+    BLOCKED: "#EF4444",
+    ARCHIVED: "#6B7280",
+    PENDING_REVIEW: "#F59E0B",
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function groupBy<T>(items: T[], key: (item: T) => string): Record<string, T[]> {
+    return items.reduce(
+        (acc, item) => {
+            const k = key(item);
+            (acc[k] ??= []).push(item);
+            return acc;
+        },
+        {} as Record<string, T[]>,
+    );
+}
+
+// ── Custom Tooltips ────────────────────────────────────────────────────────
+function CurrencyTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null;
+    return (
+        <div className="rounded-lg border bg-background p-2 text-xs shadow-md">
+            <p className="font-medium mb-1">{label}</p>
+            {payload.map((p: any) => (
+                <p key={p.dataKey} style={{ color: p.color }}>
+                    {p.name}:{" "}
+                    {p.value >= 100000
+                        ? `₹${(p.value / 100000).toFixed(2)}L`
+                        : `₹${p.value.toLocaleString("en-IN")}`}
+                </p>
+            ))}
+        </div>
+    );
+}
+
+function CountTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null;
+    return (
+        <div className="rounded-lg border bg-background p-2 text-xs shadow-md">
+            <p className="font-medium">
+                {label}: <span className="text-accent">{payload[0]?.value}</span>
+            </p>
+        </div>
+    );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+export default function AnalyticsPage() {
+    const [loading, setLoading] = useState(true);
+    const [budgets, setBudgets] = useState<Budget[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [vendors, setVendors] = useState<Vendor[]>([]);
+    const [prs, setPrs] = useState<PurchaseRequest[]>([]);
+    const [pos, setPos] = useState<PurchaseOrder[]>([]);
+
+    useEffect(() => {
+        Promise.all([
+            budgetService.list({ limit: 100 }),
+            invoiceService.list({ limit: 100 }),
+            vendorService.list({ limit: 100 }),
+            prService.list({ limit: 100 }),
+            poService.list({ limit: 100 }),
+        ])
+            .then(([b, inv, v, pr, po]) => {
+                setBudgets(b.data);
+                setInvoices(inv.data);
+                setVendors(v.data);
+                setPrs(pr.data);
+                setPos(po.data);
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, []);
+
+    // ── KPIs ────────────────────────────────────────────────────────────────
+    const totalPOSpend = pos
+        .filter((p) => !["DRAFT", "CANCELLED"].includes(p.status))
+        .reduce((s, p) => s + p.total_cents, 0);
+
+    const matchedCount = invoices.filter(
+        (i) => i.status === "MATCHED" || i.match_status === "MATCHED",
+    ).length;
+    const matchRate = invoices.length > 0 ? Math.round((matchedCount / invoices.length) * 100) : 0;
+
+    const activeVendors = vendors.filter((v) => v.status === "ACTIVE").length;
+
+    const totalBudget = budgets.reduce((s, b) => s + b.total_cents, 0);
+    const totalConsumed = budgets.reduce((s, b) => s + b.spent_cents + b.reserved_cents, 0);
+    const budgetPct = totalBudget > 0 ? Math.round((totalConsumed / totalBudget) * 100) : 0;
+
+    // ── Chart Data ──────────────────────────────────────────────────────────
+
+    // 1. Spend by Department (stacked bar)
+    const deptSpend = budgets.map((b) => ({
+        dept: b.department?.name ?? `Dept ${b.department_id.slice(0, 6)}`,
+        Spent: Math.round(b.spent_cents / 100),
+        Reserved: Math.round(b.reserved_cents / 100),
+        Available: Math.round(
+            Math.max(b.total_cents - b.spent_cents - b.reserved_cents, 0) / 100,
+        ),
+        total: Math.round(b.total_cents / 100),
+    }));
+
+    // 2. Invoice Status Pie
+    const invoiceStatusData = Object.entries(groupBy(invoices, (i) => i.status)).map(
+        ([status, items]) => ({ name: status, value: items.length }),
+    );
+
+    // 3. PR Pipeline horizontal bar
+    const prPipelineData = ["DRAFT", "PENDING", "APPROVED", "REJECTED", "CANCELLED"].map(
+        (s) => ({
+            status: s,
+            count: prs.filter((p) => p.status === s).length,
+            fill: STATUS_COLOR[s] ?? "#94A3B8",
+        }),
+    );
+
+    // 4. Top 5 Vendors by PO value
+    const vendorSpend = Object.entries(
+        groupBy(
+            pos.filter((p) => p.vendor_name),
+            (p) => p.vendor_name!,
+        ),
+    )
+        .map(([vendor, orders]) => ({
+            vendor: vendor.length > 22 ? vendor.slice(0, 22) + "…" : vendor,
+            "PO Value": Math.round(
+                orders.reduce((s, o) => s + o.total_cents, 0) / 100,
+            ),
+        }))
+        .sort((a, b) => b["PO Value"] - a["PO Value"])
+        .slice(0, 5);
+
+    // 5. Vendor Status Pie
+    const vendorStatusData = Object.entries(groupBy(vendors, (v) => v.status)).map(
+        ([status, items]) => ({
+            name: status.replace(/_/g, " "),
+            value: items.length,
+            key: status,
+        }),
+    );
+
+    // 6. Monthly Invoice Spend (line) — sorted chronologically
+    const monthMap: Record<string, { amount: number; sort: number }> = {};
+    invoices.forEach((inv) => {
+        if (!inv.created_at) return;
+        const d = new Date(inv.created_at);
+        const sort = d.getFullYear() * 100 + d.getMonth();
+        const label = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
+        if (!monthMap[label]) monthMap[label] = { amount: 0, sort };
+        monthMap[label].amount += inv.total_cents;
+    });
+    const monthlyData = Object.entries(monthMap)
+        .sort(([, a], [, b]) => a.sort - b.sort)
+        .map(([month, { amount }]) => ({
+            month,
+            "Invoice Spend": Math.round(amount / 100),
+        }));
+
+    // 7. Match status breakdown (donut)
+    const matchBreakdown = [
+        { name: "Matched", value: invoices.filter((i) => i.status === "MATCHED").length },
+        { name: "Exception", value: invoices.filter((i) => i.status === "EXCEPTION").length },
+        { name: "Disputed", value: invoices.filter((i) => i.status === "DISPUTED").length },
+        { name: "Uploaded", value: invoices.filter((i) => i.status === "UPLOADED").length },
+        { name: "Paid", value: invoices.filter((i) => i.status === "PAID").length },
+    ].filter((d) => d.value > 0);
+
+    const matchColors: Record<string, string> = {
+        Matched: "#22C55E",
+        Exception: "#EF4444",
+        Disputed: "#F97316",
+        Uploaded: "#F59E0B",
+        Paid: "#8B5CF6",
+    };
+
+    // ── Loading ──────────────────────────────────────────────────────────────
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-accent" />
+            </div>
+        );
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+                <p className="text-muted-foreground mt-1">
+                    Procurement insights across your organization
+                </p>
+            </div>
+
+            {/* ── KPI Strip ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <KpiCard
+                    label="Total PO Spend"
+                    value={formatCurrency(totalPOSpend)}
+                    sub="Across all active purchase orders"
+                    icon={<TrendingUp className="h-5 w-5 text-accent" />}
+                    iconBg="bg-accent/10"
+                />
+                <KpiCard
+                    label="Invoice Match Rate"
+                    value={`${matchRate}%`}
+                    sub={`${matchedCount} of ${invoices.length} invoices matched`}
+                    icon={<CheckCircle className="h-5 w-5 text-green-500" />}
+                    iconBg="bg-green-500/10"
+                />
+                <KpiCard
+                    label="Active Vendors"
+                    value={String(activeVendors)}
+                    sub={`of ${vendors.length} total vendors onboarded`}
+                    icon={<Users className="h-5 w-5 text-blue-500" />}
+                    iconBg="bg-blue-500/10"
+                />
+                <KpiCard
+                    label="Budget Utilized"
+                    value={`${budgetPct}%`}
+                    sub={`${formatCurrency(totalConsumed)} of ${formatCurrency(totalBudget)}`}
+                    icon={
+                        <Wallet
+                            className={`h-5 w-5 ${budgetPct >= 90 ? "text-red-500" : budgetPct >= 70 ? "text-amber-500" : "text-green-500"}`}
+                        />
+                    }
+                    iconBg={
+                        budgetPct >= 90
+                            ? "bg-red-500/10"
+                            : budgetPct >= 70
+                              ? "bg-amber-500/10"
+                              : "bg-green-500/10"
+                    }
+                />
+            </div>
+
+            {/* ── Spend by Department  +  Budget Utilization Bars ─────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Spend by Department</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {deptSpend.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={deptSpend} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="dept" tick={{ fontSize: 11 }} />
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(v) =>
+                                            v >= 100000
+                                                ? `₹${(v / 100000).toFixed(1)}L`
+                                                : `₹${(v / 1000).toFixed(0)}K`
+                                        }
+                                    />
+                                    <Tooltip content={<CurrencyTooltip />} />
+                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                    <Bar dataKey="Spent" stackId="a" fill="#4F46E5" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="Reserved" stackId="a" fill="#A5B4FC" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="Available" stackId="a" fill="#E2E8F0" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyChart />
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Budget Utilization by Department</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {deptSpend.length > 0 ? (
+                            <div className="space-y-5 py-1">
+                                {deptSpend.map((d) => {
+                                    const pct =
+                                        d.total > 0
+                                            ? Math.min(
+                                                  Math.round(((d.Spent + d.Reserved) / d.total) * 100),
+                                                  100,
+                                              )
+                                            : 0;
+                                    const color =
+                                        pct >= 90
+                                            ? "bg-red-500"
+                                            : pct >= 70
+                                              ? "bg-amber-500"
+                                              : "bg-green-500";
+                                    const textColor =
+                                        pct >= 90
+                                            ? "text-red-500"
+                                            : pct >= 70
+                                              ? "text-amber-500"
+                                              : "text-green-600";
+                                    return (
+                                        <div key={d.dept}>
+                                            <div className="flex justify-between text-xs mb-1.5">
+                                                <span className="font-medium">{d.dept}</span>
+                                                <span className={textColor + " font-semibold"}>
+                                                    {pct}%
+                                                </span>
+                                            </div>
+                                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all ${color}`}
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                ₹{(d.Spent + d.Reserved).toLocaleString("en-IN")} spent
+                                                &amp; reserved of ₹{d.total.toLocaleString("en-IN")}
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <EmptyChart />
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* ── Invoice Status  +  PR Pipeline ──────────────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Invoice Status Distribution</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {matchBreakdown.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <PieChart>
+                                    <Pie
+                                        data={matchBreakdown}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={65}
+                                        outerRadius={105}
+                                        paddingAngle={3}
+                                        dataKey="value"
+                                    >
+                                        {matchBreakdown.map((entry) => (
+                                            <Cell
+                                                key={entry.name}
+                                                fill={matchColors[entry.name] ?? "#94A3B8"}
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(v: number | undefined, name: string | undefined) => [
+                                            `${v ?? 0} invoice${(v ?? 0) !== 1 ? "s" : ""}`,
+                                            name ?? "",
+                                        ]}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyChart label="No invoice data" />
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Purchase Request Pipeline</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={280}>
+                            <BarChart
+                                data={prPipelineData}
+                                layout="vertical"
+                                margin={{ top: 4, right: 24, left: 16, bottom: 0 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                                <YAxis
+                                    type="category"
+                                    dataKey="status"
+                                    tick={{ fontSize: 11 }}
+                                    width={80}
+                                />
+                                <Tooltip content={<CountTooltip />} />
+                                <Bar dataKey="count" name="PRs" radius={[0, 4, 4, 0]}>
+                                    {prPipelineData.map((entry) => (
+                                        <Cell key={entry.status} fill={entry.fill} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* ── Top Vendors  +  Vendor Status ───────────────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Top 5 Vendors by PO Value</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {vendorSpend.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <BarChart
+                                    data={vendorSpend}
+                                    layout="vertical"
+                                    margin={{ top: 4, right: 24, left: 8, bottom: 0 }}
+                                >
+                                    <CartesianGrid
+                                        strokeDasharray="3 3"
+                                        stroke="#f0f0f0"
+                                        horizontal={false}
+                                    />
+                                    <XAxis
+                                        type="number"
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(v) =>
+                                            v >= 100000
+                                                ? `₹${(v / 100000).toFixed(1)}L`
+                                                : `₹${(v / 1000).toFixed(0)}K`
+                                        }
+                                    />
+                                    <YAxis
+                                        type="category"
+                                        dataKey="vendor"
+                                        tick={{ fontSize: 10 }}
+                                        width={130}
+                                    />
+                                    <Tooltip content={<CurrencyTooltip />} />
+                                    <Bar dataKey="PO Value" fill="#06B6D4" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyChart label="No purchase order data yet" />
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Vendor Onboarding Status</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {vendorStatusData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <PieChart>
+                                    <Pie
+                                        data={vendorStatusData}
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={105}
+                                        paddingAngle={3}
+                                        dataKey="value"
+                                        label={({ name, percent }) =>
+                                            (percent ?? 0) > 0.05
+                                                ? `${name} ${Math.round((percent ?? 0) * 100)}%`
+                                                : ""
+                                        }
+                                        labelLine={false}
+                                    >
+                                        {vendorStatusData.map((entry, i) => (
+                                            <Cell
+                                                key={entry.key}
+                                                fill={
+                                                    STATUS_COLOR[entry.key] ??
+                                                    PIE_COLORS[i % PIE_COLORS.length]
+                                                }
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(v: number | undefined, name: string | undefined) => [
+                                            `${v ?? 0} vendor${(v ?? 0) !== 1 ? "s" : ""}`,
+                                            name ?? "",
+                                        ]}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyChart label="No vendor data" />
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* ── Monthly Invoice Volume (full width) ─────────────────────── */}
+            {monthlyData.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Monthly Invoice Spend Trend</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={280}>
+                            <LineChart
+                                data={monthlyData}
+                                margin={{ top: 4, right: 24, left: 0, bottom: 0 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                                <YAxis
+                                    tick={{ fontSize: 11 }}
+                                    tickFormatter={(v) =>
+                                        v >= 100000
+                                            ? `₹${(v / 100000).toFixed(1)}L`
+                                            : `₹${(v / 1000).toFixed(0)}K`
+                                    }
+                                />
+                                <Tooltip content={<CurrencyTooltip />} />
+                                <Line
+                                    type="monotone"
+                                    dataKey="Invoice Spend"
+                                    stroke="#4F46E5"
+                                    strokeWidth={2.5}
+                                    dot={{ fill: "#4F46E5", strokeWidth: 0, r: 4 }}
+                                    activeDot={{ r: 6, strokeWidth: 0 }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
+function KpiCard({
+    label,
+    value,
+    sub,
+    icon,
+    iconBg,
+}: {
+    label: string;
+    value: string;
+    sub: string;
+    icon: React.ReactNode;
+    iconBg: string;
+}) {
+    return (
+        <Card>
+            <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <p className="text-sm text-muted-foreground">{label}</p>
+                        <p className="text-2xl font-bold font-mono mt-1">{value}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+                    </div>
+                    <div className={`rounded-full p-2.5 ${iconBg}`}>{icon}</div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function EmptyChart({ label = "No data available" }: { label?: string }) {
+    return (
+        <div className="flex h-[280px] items-center justify-center">
+            <p className="text-sm text-muted-foreground">{label}</p>
+        </div>
+    );
+}

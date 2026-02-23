@@ -6,6 +6,16 @@ class InvoiceRepository {
 
   InvoiceRepository({required ApiClient api}) : _api = api;
 
+  Future<Invoice> get(String id) async {
+    final data = await _api.getInvoice(id);
+    return Invoice.fromJson(data);
+  }
+
+  Future<String> getPresignedUrl(String fileKey) async {
+    final data = await _api.getFilePresignedUrl(fileKey);
+    return data['presigned_url'] as String;
+  }
+
   Future<List<Invoice>> list({String? status, int page = 1}) async {
     final data = await _api.getInvoices(status: status, page: page);
     final items = data['data'] as List<dynamic>? ?? data['items'] as List<dynamic>? ?? [];

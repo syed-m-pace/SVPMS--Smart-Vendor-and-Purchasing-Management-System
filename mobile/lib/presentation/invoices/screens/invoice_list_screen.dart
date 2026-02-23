@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../widgets/status_badge.dart';
@@ -73,7 +74,15 @@ class InvoiceListScreen extends StatelessWidget {
                       '${formatCurrency(inv.totalCents)} • PO: ${inv.poNumber ?? "N/A"}',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
-                    trailing: StatusBadge(status: inv.status),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        StatusBadge(status: inv.status),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right, color: Colors.grey),
+                      ],
+                    ),
+                    onTap: () => context.push('/invoices/${inv.id}'),
                   ),
                 );
               },

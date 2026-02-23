@@ -10,6 +10,7 @@ import '../../presentation/rfqs/screens/rfq_list_screen.dart';
 import '../../presentation/rfqs/screens/rfq_bidding_screen.dart';
 import '../../presentation/invoices/screens/invoice_list_screen.dart';
 import '../../presentation/invoices/screens/invoice_upload_screen.dart';
+import '../../presentation/invoices/screens/invoice_detail_screen.dart';
 import '../../presentation/profile/screens/profile_screen.dart';
 import 'app_shell.dart';
 
@@ -87,6 +88,11 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
       GoRoute(
         path: '/invoices/upload',
         builder: (context, state) => const InvoiceUploadScreen(),
+      ),
+      GoRoute(
+        path: '/invoices/:id',
+        builder: (context, state) =>
+            InvoiceDetailScreen(invoiceId: state.pathParameters['id']!),
       ),
     ],
   );

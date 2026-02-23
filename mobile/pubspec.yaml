@@ -49,6 +49,9 @@ dependencies:
   image_picker: ^1.1.2
   permission_handler: ^11.4.0
 
+  # URL / Document opening
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

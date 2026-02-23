@@ -9,6 +9,9 @@ class Invoice {
   final String? matchStatus;
   final String? invoiceDate;
   final String? createdAt;
+  final String? documentUrl;
+  final String? ocrStatus;
+  final String? vendorName;
 
   const Invoice({
     required this.id,
@@ -21,6 +24,9 @@ class Invoice {
     this.matchStatus,
     this.invoiceDate,
     this.createdAt,
+    this.documentUrl,
+    this.ocrStatus,
+    this.vendorName,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) {
@@ -35,6 +41,9 @@ class Invoice {
       matchStatus: json['match_status'],
       invoiceDate: json['invoice_date'],
       createdAt: json['created_at'],
+      documentUrl: json['document_url'],
+      ocrStatus: json['ocr_status'],
+      vendorName: json['vendor_name'],
     );
   }
 }
