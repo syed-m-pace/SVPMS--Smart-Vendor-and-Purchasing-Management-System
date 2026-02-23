@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.middleware.auth import get_current_user
 from api.middleware.tenant import get_db_with_tenant
+from api.models.purchase_request import PurchaseRequest
 from api.models.purchase_order import PurchaseOrder
 from api.models.invoice import Invoice
 from api.models.budget import Budget
