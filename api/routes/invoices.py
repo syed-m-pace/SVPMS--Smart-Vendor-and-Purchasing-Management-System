@@ -285,7 +285,7 @@ async def override_invoice(
     invoice_id: str,
     body: InvoiceOverrideRequest,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("finance_head", "cfo", "admin")),
+    _auth: None = Depends(require_roles("finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))

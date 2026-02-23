@@ -103,7 +103,7 @@ async def get_budget(
 async def create_budget(
     body: BudgetCreate,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin")),
+    _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     # Check for duplicate budget (same dept + year + quarter)

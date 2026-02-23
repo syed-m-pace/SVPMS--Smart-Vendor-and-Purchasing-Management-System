@@ -47,7 +47,7 @@ const navItems: NavItem[] = [
         label: "Exceptions",
         href: "/exceptions",
         icon: AlertTriangle,
-        roles: ["admin", "finance_head", "cfo"],
+        roles: ["admin", "manager", "finance_head", "cfo"],
     },
 ];
 

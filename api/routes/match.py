@@ -34,7 +34,7 @@ class MatchRequest(BaseModel):
 async def run_match(
     body: MatchRequest,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin")),
+    _auth: None = Depends(require_roles("finance", "finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     """Run 3-way match for an invoice against its PO and receipts."""

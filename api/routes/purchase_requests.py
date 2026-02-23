@@ -119,7 +119,7 @@ async def list_purchase_requests(
     # ---------------------------------------------------------
     
     # Roles that can see ALL PRs (across departments)
-    privileged_roles = ["admin", "finance_head", "cfo", "procurement", "viewer"]
+    privileged_roles = ["admin", "manager", "finance_head", "cfo", "procurement", "viewer"]
     
     user_role = current_user["role"]
     user_dept = current_user.get("department_id")
