@@ -266,6 +266,8 @@ export interface RFQ {
     pr_id: string | null;
     status: string;
     deadline: string | null;
+    awarded_vendor_id?: string | null;
+    awarded_po_id?: string | null;
     created_at: string;
     line_items?: RFQLineItem[];
     bids?: RFQBid[];

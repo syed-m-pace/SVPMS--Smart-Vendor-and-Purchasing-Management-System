@@ -97,10 +97,22 @@ class _RFQListScreenState extends State<RFQListScreen> {
                     itemCount: state.rfqs.length,
                     itemBuilder: (context, i) {
                       final rfq = state.rfqs[i];
+                      final isAwarded = rfq.status == 'AWARDED';
+                      final hasWonPo = isAwarded && rfq.awardedPoId != null;
+
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          onTap: () => context.push('/rfqs/${rfq.id}/bid'),
+                          onTap: () {
+                            if (hasWonPo) {
+                              // Winner: go directly to the awarded PO
+                              context.push('/purchase-orders/${rfq.awardedPoId}');
+                            } else if (!isAwarded) {
+                              // Open: go to bid screen
+                              context.push('/rfqs/${rfq.id}/bid');
+                            }
+                            // AWARDED but no po id (shouldn't happen): do nothing
+                          },
                           title: Text(
                             rfq.title,
                             style: const TextStyle(fontWeight: FontWeight.w600),
@@ -123,35 +135,63 @@ class _RFQListScreenState extends State<RFQListScreen> {
                                     fontSize: 13,
                                   ),
                                 ),
-                              if (rfq.bids.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  margin: const EdgeInsets.only(top: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.success.withValues(
-                                      alpha: 0.1,
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  if (hasWonPo)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        '🏆 You Won — Tap to view PO',
+                                        style: TextStyle(
+                                          color: AppColors.success,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  else if (rfq.bids.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'Bid Submitted',
+                                        style: TextStyle(
+                                          color: AppColors.success,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'Bid Submitted',
-                                    style: TextStyle(
-                                      color: AppColors.success,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
+                                ],
+                              ),
                             ],
                           ),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: [StatusBadge(status: rfq.status)],
+                            children: [
+                              StatusBadge(status: rfq.status),
+                              if (!isAwarded)
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 4),
+                                  child: Icon(Icons.chevron_right, size: 16),
+                                ),
+                            ],
                           ),
-                          isThreeLine: rfq.deadline != null,
+                          isThreeLine: true,
                         ),
                       );
                     },

@@ -9,7 +9,7 @@ import type { RFQ, RFQBid, Vendor } from "@/types/models";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Users, CheckCircle, Package } from "lucide-react";
+import { ArrowLeft, Clock, Users, CheckCircle, Package, XCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
 
@@ -22,6 +22,8 @@ export default function RfqDetailsPage() {
     const [vendors, setVendors] = useState<Record<string, Vendor>>({});
     const [loading, setLoading] = useState(true);
     const [awarding, setAwarding] = useState<string | null>(null);
+    const [closing, setClosing] = useState(false);
+    const [awardedPoId, setAwardedPoId] = useState<string | null>(null);
 
     const getErrorMessage = (error: unknown, fallback: string) => {
         if (isAxiosError(error)) {
@@ -36,6 +38,7 @@ export default function RfqDetailsPage() {
         try {
             const rfqData = await rfqService.get(rfqId);
             setRfq(rfqData);
+            if (rfqData.awarded_po_id) setAwardedPoId(rfqData.awarded_po_id);
 
             // Fetch vendor details for the bids
             if (rfqData.bids && rfqData.bids.length > 0) {
@@ -78,11 +81,26 @@ export default function RfqDetailsPage() {
         setAwarding(bid.id);
         try {
             const po = await rfqService.award(rfq.id, bid.id);
-            toast.success(`Successfully awarded PO to ${vendors[bid.vendor_id]?.legal_name || "vendor"}: ${po.po_number}`);
-            router.push(`/purchase-orders/${po.id}`);
+            setAwardedPoId(po.id);
+            setRfq((prev) => prev ? { ...prev, status: "AWARDED", awarded_po_id: po.id } : prev);
+            toast.success(`PO ${po.po_number} awarded to ${vendors[bid.vendor_id]?.legal_name || "vendor"}`);
         } catch (error) {
             toast.error(getErrorMessage(error, "Failed to award PO"));
             setAwarding(null);
+        }
+    };
+
+    const handleClose = async () => {
+        if (!rfq) return;
+        setClosing(true);
+        try {
+            const updated = await rfqService.close(rfq.id);
+            setRfq(updated);
+            toast.success("RFQ closed — bidding is no longer accepted");
+        } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to close RFQ"));
+        } finally {
+            setClosing(false);
         }
     };
 
@@ -93,7 +111,10 @@ export default function RfqDetailsPage() {
     if (!rfq) return null;
 
     const totalQuantity = rfq.line_items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+    const isAwarded = rfq.status === "AWARDED";
     const isClosed = rfq.status === "CLOSED" || (rfq.deadline ? new Date(rfq.deadline) < new Date() : false);
+    const canAward = (isClosed || rfq.status === "OPEN") && !isAwarded;
+    const canClose = rfq.status === "OPEN";
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
@@ -101,13 +122,34 @@ export default function RfqDetailsPage() {
                 <Button variant="ghost" size="icon" onClick={() => router.push("/purchase-orders")}>
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <div>
+                <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <h1 className="text-3xl font-bold tracking-tight">{rfq.title}</h1>
                         <StatusBadge status={rfq.status} />
                     </div>
                     <p className="text-muted-foreground mt-1 font-mono">{rfq.rfq_number}</p>
                 </div>
+                {canClose && (
+                    <Button
+                        variant="outline"
+                        onClick={handleClose}
+                        disabled={closing}
+                        className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                    >
+                        <XCircle className="h-4 w-4" />
+                        {closing ? "Closing..." : "Close RFQ"}
+                    </Button>
+                )}
+                {isAwarded && awardedPoId && (
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push(`/purchase-orders/${awardedPoId}`)}
+                        className="gap-2"
+                    >
+                        <ExternalLink className="h-4 w-4" />
+                        View PO
+                    </Button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -211,7 +253,16 @@ export default function RfqDetailsPage() {
                                                 <p className="text-2xl font-bold text-primary">{formatCurrency(bid.total_cents)}</p>
                                             </div>
 
-                                            {isClosed ? (
+                                            {isAwarded ? (
+                                                <Button
+                                                    onClick={() => router.push(`/purchase-orders${awardedPoId ? `/${awardedPoId}` : ""}`)}
+                                                    className="w-full gap-2 shadow-md"
+                                                    variant="outline"
+                                                >
+                                                    View PO
+                                                    <ExternalLink className="h-4 w-4" />
+                                                </Button>
+                                            ) : canAward ? (
                                                 <Button
                                                     onClick={() => handleAward(bid)}
                                                     disabled={awarding !== null}
@@ -222,16 +273,10 @@ export default function RfqDetailsPage() {
                                                     <CheckCircle className="h-4 w-4" />
                                                 </Button>
                                             ) : (
-                                                <div onClick={() => toast.error("Cannot proceed until deadline")} className="w-full cursor-not-allowed">
-                                                    <Button
-                                                        disabled
-                                                        className="w-full gap-2 shadow-md opacity-50 pointer-events-none"
-                                                        variant="default"
-                                                    >
-                                                        Award PO
-                                                        <CheckCircle className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
+                                                <Button disabled className="w-full gap-2 opacity-50" variant="default">
+                                                    Award PO
+                                                    <CheckCircle className="h-4 w-4" />
+                                                </Button>
                                             )}
                                         </div>
                                     </div>

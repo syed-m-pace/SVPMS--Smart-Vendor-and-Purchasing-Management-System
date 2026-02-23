@@ -18,4 +18,8 @@ export const rfqService = {
         const { data } = await api.post<PurchaseOrder>(`/rfqs/${rfqId}/award`, { bid_id: bidId });
         return data;
     },
+    close: async (rfqId: string) => {
+        const { data } = await api.post<RFQ>(`/rfqs/${rfqId}/close`);
+        return data;
+    },
 };

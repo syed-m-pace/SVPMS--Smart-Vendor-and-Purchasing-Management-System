@@ -7,6 +7,8 @@ class RFQ {
   final String? deadline;
   final String? createdAt;
   final int? budgetCents;
+  final String? awardedVendorId;
+  final String? awardedPoId;
   final List<RFQLineItem> lineItems;
   final List<RFQBid> bids;
 
@@ -19,6 +21,8 @@ class RFQ {
     this.deadline,
     this.createdAt,
     this.budgetCents,
+    this.awardedVendorId,
+    this.awardedPoId,
     this.lineItems = const [],
     this.bids = const [],
   });
@@ -33,6 +37,8 @@ class RFQ {
       deadline: json['deadline'],
       createdAt: json['created_at'],
       budgetCents: json['budget_cents'],
+      awardedVendorId: json['awarded_vendor_id'],
+      awardedPoId: json['awarded_po_id'],
       lineItems:
           (json['line_items'] as List<dynamic>?)
               ?.map((e) => RFQLineItem.fromJson(e as Map<String, dynamic>))

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -87,6 +87,8 @@ async def _build_response(db: AsyncSession, rfq: Rfq, current_user: dict = None)
         status=rfq.status,
         deadline=rfq.deadline.isoformat() if rfq.deadline else "",
         created_by=str(rfq.created_by),
+        awarded_vendor_id=str(rfq.awarded_vendor_id) if rfq.awarded_vendor_id else None,
+        awarded_po_id=str(rfq.awarded_po_id) if rfq.awarded_po_id else None,
         line_items=[_line_to_response(li) for li in lines_result.scalars().all()],
         bids=[_bid_to_response(b) for b in bids_result.scalars().all()],
         created_at=rfq.created_at.isoformat() if rfq.created_at else "",
@@ -104,7 +106,28 @@ async def list_rfqs(
     q = select(Rfq)
     count_q = select(func.count(Rfq.id))
 
-    if rfq_status:
+    # Vendor role: only OPEN RFQs + AWARDED RFQs where they are the winning vendor
+    if current_user["role"] == "vendor":
+        vendor_result = await db.execute(
+            select(Vendor).where(
+                Vendor.email == current_user["email"],
+                Vendor.deleted_at == None,  # noqa: E711
+            )
+        )
+        vendor = vendor_result.scalar_one_or_none()
+        if not vendor:
+            return PaginatedResponse(data=[], pagination=build_pagination(page, limit, 0))
+        vendor_filter = or_(
+            Rfq.status == "OPEN",
+            (Rfq.status == "AWARDED") & (Rfq.awarded_vendor_id == vendor.id),
+        )
+        q = q.where(vendor_filter)
+        count_q = count_q.where(vendor_filter)
+        # Allow further status filter only within the vendor's visible scope
+        if rfq_status:
+            q = q.where(Rfq.status == rfq_status)
+            count_q = count_q.where(Rfq.status == rfq_status)
+    elif rfq_status:
         q = q.where(Rfq.status == rfq_status)
         count_q = count_q.where(Rfq.status == rfq_status)
 
@@ -431,6 +454,8 @@ async def award_rfq(
         ))
 
     rfq.status = "AWARDED"
+    rfq.awarded_vendor_id = vendor.id
+    rfq.awarded_po_id = po.id
     await db.flush()
 
     # Fetch line items for response

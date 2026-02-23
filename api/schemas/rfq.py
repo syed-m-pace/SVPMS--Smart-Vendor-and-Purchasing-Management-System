@@ -56,6 +56,8 @@ class RfqResponse(BaseModel):
     status: str
     deadline: str
     created_by: str
+    awarded_vendor_id: Optional[str] = None
+    awarded_po_id: Optional[str] = None
     line_items: List[RfqLineItemResponse] = []
     bids: List[RfqBidResponse] = []
     created_at: str
