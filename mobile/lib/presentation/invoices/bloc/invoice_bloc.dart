@@ -36,7 +36,7 @@ class UploadInvoice extends InvoiceEvent {
 class DisputeInvoice extends InvoiceEvent {
   final String invoiceId;
   final String? reason;
-  const DisputeInvoice({required this.invoiceId, this.reason});
+  DisputeInvoice({required this.invoiceId, this.reason});
   @override
   List<Object?> get props => [invoiceId, reason];
 }

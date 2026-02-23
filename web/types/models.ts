@@ -187,6 +187,7 @@ export type InvoiceStatus =
     | "MATCHED"
     | "DISPUTED"
     | "EXCEPTION"
+    | "APPROVED"
     | "PAID"
     | "REJECTED";
 
