@@ -40,5 +40,17 @@ class UpstashClient:
     async def delete(self, key: str):
         await _http.get(f"{self.url}/del/{key}", headers=self.headers)
 
+    async def setnx(self, key: str, value: str, ex: int = 300) -> bool:
+        """Set key only if it does not exist. Returns True if the key was set."""
+        r = await _http.get(
+            f"{self.url}/set/{key}/{value}/nx/ex/{ex}", headers=self.headers
+        )
+        result = r.json().get("result")
+        return result == "OK"
+
+    async def ping(self) -> bool:
+        r = await _http.get(f"{self.url}/ping", headers=self.headers)
+        return r.json().get("result") == "PONG"
+
 
 cache = UpstashClient()

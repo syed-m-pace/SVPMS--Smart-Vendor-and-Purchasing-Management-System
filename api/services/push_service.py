@@ -6,16 +6,82 @@ Sends multicast push to user devices via Firebase Admin SDK.
 """
 
 import asyncio
+import logging
 from typing import Optional
 
 from firebase_admin import messaging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 import structlog
 
 from api.models.user_device import UserDevice
 
 logger = structlog.get_logger()
+_std_logger = logging.getLogger(__name__)
+
+
+class _FCMTransientError(Exception):
+    """Wraps transient Firebase errors that are safe to retry."""
+
+
+@retry(
+    retry=retry_if_exception_type(_FCMTransientError),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    before_sleep=before_sleep_log(_std_logger, logging.WARNING),
+    reraise=False,
+)
+async def _multicast_with_retry(
+    message: messaging.MulticastMessage,
+    devices: list,
+    session: AsyncSession,
+) -> None:
+    loop = asyncio.get_event_loop()
+    try:
+        response = await loop.run_in_executor(
+            None, messaging.send_each_for_multicast, message
+        )
+    except messaging.FirebaseError as exc:
+        # Distinguish retryable (quota / server) from permanent errors
+        if getattr(exc, "http_response", None) and exc.http_response.status_code >= 500:
+            logger.warning("push_fcm_5xx_retrying", error=str(exc))
+            raise _FCMTransientError(str(exc)) from exc
+        logger.error("push_fcm_permanent_error", error=str(exc))
+        return
+    except Exception as exc:
+        logger.warning("push_fcm_unknown_error_retrying", error=str(exc))
+        raise _FCMTransientError(str(exc)) from exc
+
+    logger.info(
+        "push_sent",
+        success=response.success_count,
+        failure=response.failure_count,
+        total=len(devices),
+    )
+
+    # Clean up unregistered / mismatched tokens
+    if response.failure_count > 0:
+        for idx, send_response in enumerate(response.responses):
+            if send_response.exception and isinstance(
+                send_response.exception,
+                (messaging.UnregisteredError, messaging.SenderIdMismatchError),
+            ):
+                device_id = devices[idx].id
+                device = await session.get(UserDevice, device_id)
+                if device:
+                    device.is_active = False
+                    logger.info(
+                        "push_token_deactivated",
+                        device_id=str(device_id),
+                        reason=type(send_response.exception).__name__,
+                    )
 
 
 async def send_push(
@@ -24,9 +90,11 @@ async def send_push(
     title: str,
     body: str,
     data: Optional[dict] = None,
-):
+) -> None:
     """
     Send FCM push notification to all active devices of specified users.
+
+    Retries up to 3 times on transient Firebase server errors.
 
     Args:
         session: DB session (tenant context should already be set)
@@ -61,38 +129,10 @@ async def send_push(
     )
 
     try:
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, messaging.send_each_for_multicast, message)
-        logger.info(
-            "push_sent",
-            success=response.success_count,
-            failure=response.failure_count,
-            total=len(tokens),
+        await _multicast_with_retry(message, devices, session)
+    except Exception as exc:
+        logger.error(
+            "push_all_retries_exhausted",
+            error=str(exc),
+            user_ids=user_ids,
         )
-
-        # Clean up unregistered tokens
-        if response.failure_count > 0:
-            for idx, send_response in enumerate(response.responses):
-                if (
-                    send_response.exception
-                    and isinstance(
-                        send_response.exception,
-                        (
-                            messaging.UnregisteredError,
-                            messaging.SenderIdMismatchError,
-                        ),
-                    )
-                ):
-                    # Deactivate stale device
-                    device_id = devices[idx].id
-                    device = await session.get(UserDevice, device_id)
-                    if device:
-                        device.is_active = False
-                        logger.info(
-                            "push_token_deactivated",
-                            device_id=str(device_id),
-                            reason=type(send_response.exception).__name__,
-                        )
-
-    except Exception as e:
-        logger.error("push_failed", error=str(e), user_ids=user_ids)

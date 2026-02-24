@@ -8,6 +8,8 @@ import '../../presentation/purchase_orders/screens/po_list_screen.dart';
 import '../../presentation/purchase_orders/screens/po_detail_screen.dart';
 import '../../presentation/rfqs/screens/rfq_list_screen.dart';
 import '../../presentation/rfqs/screens/rfq_bidding_screen.dart';
+import '../../presentation/rfqs/screens/rfq_detail_screen.dart';
+import '../../presentation/notifications/screens/notifications_screen.dart';
 import '../../presentation/invoices/screens/invoice_list_screen.dart';
 import '../../presentation/invoices/screens/invoice_upload_screen.dart';
 import '../../presentation/invoices/screens/invoice_detail_screen.dart';
@@ -61,13 +63,10 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
           GoRoute(
             path: '/rfqs',
             builder: (context, state) => const RFQListScreen(),
-            routes: [
-              GoRoute(
-                path: ':id/bid',
-                builder: (context, state) =>
-                    RFQBiddingScreen(rfqId: state.pathParameters['id']!),
-              ),
-            ],
+          ),
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationsScreen(),
           ),
           GoRoute(
             path: '/invoices',
@@ -84,6 +83,16 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
         path: '/purchase-orders/:id',
         builder: (context, state) =>
             PODetailScreen(poId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/rfqs/:id/bid',
+        builder: (context, state) =>
+            RFQBiddingScreen(rfqId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/rfqs/:id',
+        builder: (context, state) =>
+            RFQDetailScreen(rfqId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/invoices/upload',

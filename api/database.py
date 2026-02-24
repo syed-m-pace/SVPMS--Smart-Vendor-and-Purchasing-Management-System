@@ -52,11 +52,15 @@ async def get_db():
 
 
 async def set_tenant_context(session: AsyncSession, tenant_id: str):
-    # SET LOCAL does not support parameterized queries in asyncpg.
-    # Validate tenant_id is a UUID to prevent SQL injection, then interpolate.
+    # Use set_config() which supports parameterized queries in asyncpg,
+    # eliminating the f-string interpolation risk. Third arg 'true' scopes it
+    # to the current transaction only (equivalent to SET LOCAL).
     import uuid as _uuid
     _uuid.UUID(str(tenant_id))  # raises ValueError if not a valid UUID
-    await session.execute(text(f"SET LOCAL app.current_tenant_id = '{tenant_id}'"))
+    await session.execute(
+        text("SELECT set_config('app.current_tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
 
 
 async def init_db():

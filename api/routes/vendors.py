@@ -25,6 +25,9 @@ from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
 from api.services.auth_service import hash_password
 from api.services.email_service import send_email
+from api.services.vendor_service import resolve_vendor_for_user
+from api.services.scorecard_service import compute_vendor_scorecard
+from api.services.risk_score_service import compute_vendor_risk_score
 from api.config import settings
 
 logger = structlog.get_logger()
@@ -65,23 +68,6 @@ def _to_response(v: Vendor) -> VendorResponse:
         updated_at=v.updated_at.isoformat() if v.updated_at else "",
     )
 
-
-async def _resolve_vendor_for_user(
-    db: AsyncSession, current_user: dict
-) -> Optional[Vendor]:
-    result = await db.execute(
-        select(Vendor)
-        .where(
-            Vendor.tenant_id == current_user["tenant_id"],
-            Vendor.email == current_user["email"],
-            Vendor.deleted_at == None,  # noqa: E711
-        )
-        .order_by(
-            case((Vendor.status == "ACTIVE", 0), else_=1),
-            Vendor.created_at.asc(),
-        )
-    )
-    return result.scalars().first()
 
 
 @router.get("", response_model=PaginatedResponse[VendorResponse])
@@ -151,7 +137,7 @@ async def get_vendor_me(
     if current_user["role"] != "vendor":
         raise HTTPException(status_code=403, detail="Only vendor users can access this endpoint")
 
-    vendor = await _resolve_vendor_for_user(db, current_user)
+    vendor = await resolve_vendor_for_user(db, current_user)
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor profile not found")
 
@@ -378,6 +364,69 @@ async def approve_vendor(
 
     await db.flush()
     return _to_response(vendor)
+
+
+@router.get("/{vendor_id}/scorecard")
+async def get_vendor_scorecard(
+    vendor_id: str,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(
+        require_roles(
+            "admin", "finance_head", "cfo", "procurement", "procurement_lead",
+            "finance", "manager", "vendor",
+        )
+    ),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """
+    Compute and return vendor performance scorecard.
+
+    Vendors can only access their own scorecard; privileged roles see any vendor.
+    """
+    result = await db.execute(
+        select(Vendor).where(Vendor.id == vendor_id, Vendor.deleted_at == None)  # noqa: E711
+    )
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    # Vendors may only view their own scorecard
+    if current_user["role"] == "vendor" and vendor.email != current_user["email"]:
+        raise HTTPException(status_code=403, detail="Cannot access another vendor's scorecard")
+
+    scorecard = await compute_vendor_scorecard(db, vendor_id)
+    return {
+        "vendor_id": vendor_id,
+        "vendor_name": vendor.legal_name,
+        "on_time_delivery_rate": scorecard.on_time_delivery_rate,
+        "invoice_acceptance_rate": scorecard.invoice_acceptance_rate,
+        "po_fulfillment_rate": scorecard.po_fulfillment_rate,
+        "rfq_response_rate": scorecard.rfq_response_rate,
+        "avg_invoice_processing_days": scorecard.avg_invoice_processing_days,
+        "total_pos": scorecard.total_pos,
+        "total_invoices": scorecard.total_invoices,
+        "total_rfqs_invited": scorecard.total_rfqs_invited,
+        "composite_score": scorecard.composite_score,
+    }
+
+
+@router.post("/{vendor_id}/refresh-risk-score")
+async def refresh_vendor_risk_score(
+    vendor_id: str,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(
+        require_roles("admin", "finance_head", "cfo", "procurement_lead", "procurement")
+    ),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """
+    Recompute and persist the vendor risk score (0–100).
+    Lower is better. Factors: document compliance, invoice exception rate, delivery performance.
+    """
+    score = await compute_vendor_risk_score(db, vendor_id)
+    if score is None:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return {"vendor_id": vendor_id, "risk_score": score}
 
 
 @router.post("/{vendor_id}/block", response_model=VendorResponse)

@@ -101,6 +101,33 @@ TEMPLATES = {
             "<p>Please log in to the SVPMS Vendor App to acknowledge the PO and confirm delivery details.</p>"
         ),
     },
+    "document_expiry": {
+        "subject": "[SVPMS] Compliance Document Expiring in {days_remaining} Day(s) — Action Required",
+        "html": (
+            "<h2>Compliance Document Expiring Soon</h2>"
+            "<p>Dear <strong>{vendor_name}</strong>,</p>"
+            "<p>Your compliance document of type <strong>{document_type}</strong> is expiring "
+            "in <strong>{days_remaining} day(s)</strong> (on {expiry_date}).</p>"
+            "<p>Please upload a renewed document at your earliest convenience to avoid disruption "
+            "to your vendor status.</p>"
+            "<p>Log in to SVPMS to manage your compliance documents.</p>"
+        ),
+    },
+    "approval_timeout": {
+        "subject": "[SVPMS] Reminder — Approval Required: {entity_type} {entity_ref}",
+        "html": (
+            "<h2>Approval Reminder</h2>"
+            "<p>Dear <strong>{approver_name}</strong>,</p>"
+            "<p>The following item has been awaiting your approval for "
+            "<strong>{hours_pending} hours</strong> and requires your immediate attention:</p>"
+            "<ul>"
+            "<li><strong>Type:</strong> {entity_type}</li>"
+            "<li><strong>Reference:</strong> {entity_ref}</li>"
+            "<li><strong>Approval Level:</strong> {approval_level}</li>"
+            "</ul>"
+            "<p>Please log in to SVPMS to approve or reject this request.</p>"
+        ),
+    },
 }
 
 

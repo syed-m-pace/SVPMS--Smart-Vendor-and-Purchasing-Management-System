@@ -16,3 +16,5 @@ from api.models.audit_log import AuditLog  # noqa: F401
 from api.models.rfq import Rfq, RfqLineItem, RfqBid  # noqa: F401
 from api.models.payment import Payment  # noqa: F401
 from api.models.user_device import UserDevice  # noqa: F401
+from api.models.fx_rate import FxRate  # noqa: F401
+from api.models.contract import Contract  # noqa: F401

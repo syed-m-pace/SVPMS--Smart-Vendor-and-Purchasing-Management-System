@@ -23,6 +23,7 @@ from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
 from api.services.notification_service import send_notification
 from api.services.storage import r2_client
+from api.services.vendor_service import resolve_vendor_for_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -93,8 +94,7 @@ async def list_invoices(
 
     scoped_vendor_id = None
     if current_user["role"] == "vendor":
-        from api.routes.purchase_orders import _resolve_vendor_for_user
-        vendor = await _resolve_vendor_for_user(db, current_user)
+        vendor = await resolve_vendor_for_user(db, current_user)
         if not vendor:
             return PaginatedResponse(
                 data=[],

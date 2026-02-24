@@ -82,17 +82,11 @@ class _AppShellState extends State<AppShell> {
         appBar: AppBar(
           title: Text(_title(index)),
           actions: [
-            if (index == 0) // dashboard tab
-              IconButton(
-                icon: const Icon(Icons.notifications),
-                tooltip: 'Notifications',
-                onPressed: () {
-                  // Placeholder for notifications
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
-                },
-              ),
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              tooltip: 'Notifications',
+              onPressed: () => context.push('/notifications'),
+            ),
             FutureBuilder<Vendor>(
               future: _vendorFuture,
               builder: (context, snapshot) {

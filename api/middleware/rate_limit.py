@@ -1,8 +1,12 @@
 # api/middleware/rate_limit.py
 """
 Distributed rate limiting via Upstash Redis.
+Role-aware: privileged internal users get higher limits than vendor accounts.
 From 01_BACKEND.md §5.6.
 """
+
+import base64
+import json
 
 from fastapi import Request, HTTPException
 from api.services.cache import cache
@@ -10,23 +14,65 @@ import structlog
 
 logger = structlog.get_logger()
 
-RATE_LIMITS = {
-    "default": {"limit": 100, "window": 60},
-    "auth": {"limit": 10, "window": 60},
-    "upload": {"limit": 5, "window": 60},
+# Limits per (role_tier, path_category): {limit, window_seconds}
+_TIER_LIMITS = {
+    # admin / finance / cfo / procurement_lead
+    "privileged": {
+        "auth": {"limit": 20, "window": 60},
+        "upload": {"limit": 20, "window": 60},
+        "default": {"limit": 500, "window": 60},
+    },
+    # procurement / manager / finance
+    "internal": {
+        "auth": {"limit": 15, "window": 60},
+        "upload": {"limit": 10, "window": 60},
+        "default": {"limit": 200, "window": 60},
+    },
+    # vendor role or unauthenticated
+    "vendor": {
+        "auth": {"limit": 10, "window": 60},
+        "upload": {"limit": 5, "window": 60},
+        "default": {"limit": 60, "window": 60},
+    },
 }
+
+_PRIVILEGED_ROLES = {"admin", "finance_head", "cfo", "procurement_lead"}
+_INTERNAL_ROLES = {"procurement", "manager", "finance"}
 
 SKIP_PATHS = {"/health"}
 SKIP_PREFIXES = ("/internal/",)
 
 
-def _get_limit_config(path: str) -> dict:
-    """Determine rate limit config based on request path."""
+def _get_role_tier(request: Request) -> str:
+    """
+    Extract user role from JWT payload (middle section of Bearer token).
+    Fails open — returns 'vendor' tier on any decode error to stay conservative.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return "vendor"
+    try:
+        token = auth_header.split(" ", 1)[1]
+        payload_b64 = token.split(".")[1]
+        # Add padding
+        payload_b64 += "=" * (4 - len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        role = payload.get("role", "")
+        if role in _PRIVILEGED_ROLES:
+            return "privileged"
+        if role in _INTERNAL_ROLES:
+            return "internal"
+        return "vendor"
+    except Exception:
+        return "vendor"
+
+
+def _get_path_category(path: str) -> str:
     if path.startswith("/auth"):
-        return RATE_LIMITS["auth"]
+        return "auth"
     if "/files/upload" in path:
-        return RATE_LIMITS["upload"]
-    return RATE_LIMITS["default"]
+        return "upload"
+    return "default"
 
 
 async def rate_limit_middleware(request: Request, call_next):
@@ -35,7 +81,6 @@ async def rate_limit_middleware(request: Request, call_next):
     Tracks requests per IP + endpoint pattern with sliding window.
     Internal job endpoints are skipped (they use Bearer token auth instead).
     """
-    # Skip health check and internal endpoints
     path = request.url.path
     if path in SKIP_PATHS or path.startswith(SKIP_PREFIXES):
         return await call_next(request)
@@ -43,19 +88,19 @@ async def rate_limit_middleware(request: Request, call_next):
     # Use X-Forwarded-For when running behind a reverse proxy (Cloud Run, etc.)
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
-        # Take the first IP in the chain (the original client)
         client_ip = forwarded_for.split(",")[0].strip()
     else:
         client_ip = request.client.host if request.client else "unknown"
-    config = _get_limit_config(path)
+
+    tier = _get_role_tier(request)
+    category = _get_path_category(path)
+    config = _TIER_LIMITS[tier][category]
     limit = config["limit"]
     window = config["window"]
 
-    # Build rate limit key
-    key = f"rl:{client_ip}:{path}"
+    key = f"rl:{tier}:{client_ip}:{path}"
 
     try:
-        # Use a pipeline to combine INCR + EXPIRE into a single HTTP round-trip
         results = await cache.pipeline([
             ["INCR", key],
             ["EXPIRE", key, window],
@@ -67,6 +112,7 @@ async def rate_limit_middleware(request: Request, call_next):
                 "rate_limited",
                 ip=client_ip,
                 path=path,
+                tier=tier,
                 current=current,
                 limit=limit,
             )
@@ -79,7 +125,6 @@ async def rate_limit_middleware(request: Request, call_next):
     except HTTPException:
         raise
     except Exception as e:
-        # If Redis is down, allow the request (fail-open)
         logger.warning("rate_limit_cache_error", error=str(e))
 
     return await call_next(request)

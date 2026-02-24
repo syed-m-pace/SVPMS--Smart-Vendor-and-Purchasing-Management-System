@@ -104,16 +104,8 @@ class _RFQListScreenState extends State<RFQListScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           onTap: () {
-                            if (hasWonPo) {
-                              // Winner: go directly to the awarded PO
-                              context.push(
-                                '/purchase-orders/${rfq.awardedPoId}',
-                              );
-                            } else if (!isAwarded) {
-                              // Open: go to bid screen
-                              context.push('/rfqs/${rfq.id}/bid');
-                            }
-                            // AWARDED but no po id (shouldn't happen): do nothing
+                            // Always navigate to the RFQ detail screen first
+                            context.push('/rfqs/${rfq.id}');
                           },
                           title: Text(
                             rfq.title,

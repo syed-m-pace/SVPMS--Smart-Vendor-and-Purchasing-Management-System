@@ -81,6 +81,27 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserUpdateRequest(BaseModel):
+    """Typed schema for PUT /users/{user_id}. Replaces untyped body: dict."""
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    profile_photo_url: Optional[str] = Field(None, max_length=500)
+    # Admin-only fields — enforced at route level, declared here for documentation
+    role: Optional[str] = Field(None)
+    department_id: Optional[str] = Field(None)
+    is_active: Optional[bool] = None
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in (
+            "admin", "manager", "finance", "finance_head", "cfo",
+            "procurement", "procurement_lead", "vendor",
+        ):
+            raise ValueError(f"Invalid role: {v}")
+        return v
+
+
 class UserCreateRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)

@@ -111,10 +111,11 @@ async def list_purchase_requests(
     # ---------------------------------------------------------
     # VISIBILITY LOGIC
     # ---------------------------------------------------------
-    
+
     # Roles that can see ALL PRs (across departments)
-    privileged_roles = ["admin", "manager", "finance_head", "cfo", "procurement", "viewer"]
-    
+    # Note: "manager" is intentionally excluded — managers are scoped to their department below.
+    privileged_roles = ["admin", "finance_head", "cfo", "procurement", "procurement_lead"]
+
     user_role = current_user["role"]
     user_dept = current_user.get("department_id")
 
@@ -122,7 +123,7 @@ async def list_purchase_requests(
         pass  # No extra filter needed (except Drafts below)
 
     elif user_role == "manager" and user_dept:
-        # Managers see their department + their own
+        # Managers see their department + their own PRs only
         q = q.where(
             or_(
                 PurchaseRequest.department_id == user_dept,
@@ -137,7 +138,7 @@ async def list_purchase_requests(
         )
 
     else:
-        # Everyone else (Employee, Vendor, etc.) -> OWN ONLY
+        # Everyone else (vendor, finance, etc.) -> OWN ONLY
         q = q.where(PurchaseRequest.requester_id == current_user["user_id"])
         count_q = count_q.where(PurchaseRequest.requester_id == current_user["user_id"])
 

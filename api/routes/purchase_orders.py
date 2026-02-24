@@ -26,6 +26,7 @@ from api.services.budget_service import release_budget_reservation, commit_budge
 from api.services.audit_service import create_audit_log
 from api.services.notification_service import send_notification
 from api.services.push_service import send_push
+from api.services.vendor_service import resolve_vendor_for_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -93,23 +94,6 @@ async def _get_line_items(db: AsyncSession, po_id) -> list[PoLineItem]:
     return list(result.scalars().all())
 
 
-async def _resolve_vendor_for_user(
-    db: AsyncSession, current_user: dict
-) -> Optional[Vendor]:
-    result = await db.execute(
-        select(Vendor)
-        .where(
-            Vendor.tenant_id == current_user["tenant_id"],
-            Vendor.email == current_user["email"],
-            Vendor.deleted_at == None,  # noqa: E711
-        )
-        .order_by(
-            case((Vendor.status == "ACTIVE", 0), else_=1),
-            Vendor.created_at.asc(),
-        )
-    )
-    return result.scalars().first()
-
 
 @router.get("", response_model=PaginatedResponse[PurchaseOrderResponse])
 async def list_purchase_orders(
@@ -126,7 +110,7 @@ async def list_purchase_orders(
 
     scoped_vendor_id = None
     if current_user["role"] == "vendor":
-        vendor = await _resolve_vendor_for_user(db, current_user)
+        vendor = await resolve_vendor_for_user(db, current_user)
         if not vendor:
             return PaginatedResponse(
                 data=[],
@@ -246,7 +230,7 @@ async def get_purchase_order(
     po, vendor_name = row
 
     if current_user["role"] == "vendor":
-        vendor = await _resolve_vendor_for_user(db, current_user)
+        vendor = await resolve_vendor_for_user(db, current_user)
         if not vendor or po.vendor_id != vendor.id:
             raise HTTPException(status_code=404, detail="Purchase order not found")
 
@@ -422,7 +406,7 @@ async def acknowledge_purchase_order(
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
 
-    vendor = await _resolve_vendor_for_user(db, current_user)
+    vendor = await resolve_vendor_for_user(db, current_user)
     if not vendor or po.vendor_id != vendor.id:
         raise HTTPException(status_code=404, detail="Purchase order not found")
 

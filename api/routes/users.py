@@ -9,7 +9,7 @@ from api.middleware.auth import get_current_user
 from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
 from api.models.user import User
-from api.schemas.auth import UserCreateRequest, UserResponse
+from api.schemas.auth import UserCreateRequest, UserResponse, UserUpdateRequest
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.auth_service import hash_password
 from api.services.storage import r2_client
@@ -133,7 +133,7 @@ async def create_user(
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: str,
-    body: dict,
+    body: UserUpdateRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
@@ -145,17 +145,14 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    allowed = {
-        "first_name",
-        "last_name",
-        "profile_photo_url",
-    }
-    if current_user["role"] == "admin":
-        allowed.update({"role", "department_id", "is_active"})
+    # Non-admin users can only update their own profile fields
+    update_data = body.model_dump(exclude_none=True)
+    admin_only_fields = {"role", "department_id", "is_active"}
 
-    for k, v in body.items():
-        if k in allowed:
-            setattr(user, k, v)
+    for field, value in update_data.items():
+        if field in admin_only_fields and current_user["role"] != "admin":
+            continue
+        setattr(user, field, value)
 
     await db.flush()
     await db.refresh(user)

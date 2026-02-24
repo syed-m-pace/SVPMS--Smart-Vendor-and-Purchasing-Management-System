@@ -1,6 +1,8 @@
 import asyncio
-from fastapi import FastAPI, Depends, Response, status
+from fastapi import FastAPI, Depends, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import structlog
 
@@ -40,8 +42,40 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
+
+
+# ---------------------------------------------------------------------------
+# Global exception handlers — normalize all errors to structured format:
+# {"error": {"code": "...", "message": "..."}}
+# Per 01_BACKEND.md §6.
+# ---------------------------------------------------------------------------
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    detail = exc.detail
+    if isinstance(detail, str):
+        detail = {"error": {"code": "HTTP_ERROR", "message": detail}}
+    elif isinstance(detail, dict) and "error" not in detail:
+        detail = {"error": detail}
+    return JSONResponse(status_code=exc.status_code, content=detail)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Request validation failed",
+                "details": exc.errors(),
+            }
+        },
+    )
+
 
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
@@ -109,10 +143,17 @@ from api.jobs.scheduled import router as jobs_router  # noqa: E402
 from api.routes.approvals import router as approvals_router  # noqa: E402
 from api.routes.audit_logs import router as audit_logs_router  # noqa: E402
 from api.routes.dashboard import router as dashboard_router  # noqa: E402
+from api.routes.analytics import router as analytics_router  # noqa: E402
+from api.routes.fx_rates import router as fx_rates_router  # noqa: E402
+from api.routes.contracts import router as contracts_router  # noqa: E402
+from api.routes.webhooks import router as webhooks_router  # noqa: E402
 
 # Rate limiting middleware (Upstash Redis)
 from api.middleware.rate_limit import rate_limit_middleware  # noqa: E402
+from api.middleware.idempotency import IdempotencyMiddleware  # noqa: E402
+
 app.middleware("http")(rate_limit_middleware)
+app.add_middleware(IdempotencyMiddleware)
 
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(departments_router, prefix="/api/v1/departments", tags=["Departments"])
@@ -130,4 +171,8 @@ app.include_router(match_router, prefix="/api/v1/match", tags=["Matching"])
 app.include_router(approvals_router, prefix="/api/v1/approvals", tags=["Approvals"])
 app.include_router(audit_logs_router, prefix="/api/v1/audit-logs", tags=["Audit Logs"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Dashboard"])
+app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(fx_rates_router, prefix="/api/v1/fx-rates", tags=["FX Rates"])
+app.include_router(contracts_router, prefix="/api/v1/contracts", tags=["Contracts"])
+app.include_router(webhooks_router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(jobs_router, prefix="/internal/jobs", tags=["Internal Jobs"])
