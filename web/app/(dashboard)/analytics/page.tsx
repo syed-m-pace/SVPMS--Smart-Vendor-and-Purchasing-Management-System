@@ -104,11 +104,11 @@ export default function AnalyticsPage() {
 
     useEffect(() => {
         Promise.allSettled([
-            budgetService.list({ limit: 100 }),
-            invoiceService.list({ limit: 100 }),
-            vendorService.list({ limit: 100 }),
-            prService.list({ limit: 100 }),
-            poService.list({ limit: 100 }),
+            budgetService.list({ limit: 25 }),
+            invoiceService.list({ limit: 25 }),
+            vendorService.list({ limit: 25 }),
+            prService.list({ limit: 25 }),
+            poService.list({ limit: 25 }),
         ])
             .then(([b, inv, v, pr, po]) => {
                 setBudgets(b.status === "fulfilled" ? b.value.data : []);
@@ -278,8 +278,8 @@ export default function AnalyticsPage() {
                         budgetPct >= 90
                             ? "bg-red-500/10"
                             : budgetPct >= 70
-                              ? "bg-amber-500/10"
-                              : "bg-green-500/10"
+                                ? "bg-amber-500/10"
+                                : "bg-green-500/10"
                     }
                 />
             </div>
@@ -328,22 +328,22 @@ export default function AnalyticsPage() {
                                     const pct =
                                         d.total > 0
                                             ? Math.min(
-                                                  Math.round(((d.Spent + d.Reserved) / d.total) * 100),
-                                                  100,
-                                              )
+                                                Math.round(((d.Spent + d.Reserved) / d.total) * 100),
+                                                100,
+                                            )
                                             : 0;
                                     const color =
                                         pct >= 90
                                             ? "bg-red-500"
                                             : pct >= 70
-                                              ? "bg-amber-500"
-                                              : "bg-green-500";
+                                                ? "bg-amber-500"
+                                                : "bg-green-500";
                                     const textColor =
                                         pct >= 90
                                             ? "text-red-500"
                                             : pct >= 70
-                                              ? "text-amber-500"
-                                              : "text-green-600";
+                                                ? "text-amber-500"
+                                                : "text-green-600";
                                     return (
                                         <div key={d.dept}>
                                             <div className="flex justify-between text-xs mb-1.5">

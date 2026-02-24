@@ -41,7 +41,7 @@ def _to_response(u: User) -> UserResponse:
 @router.get("", response_model=PaginatedResponse[UserResponse])
 async def list_users(
     page: int = Query(1, ge=1, le=1000),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=25),
     role: str = Query(None),
     is_active: bool = Query(None),
     current_user: dict = Depends(get_current_user),

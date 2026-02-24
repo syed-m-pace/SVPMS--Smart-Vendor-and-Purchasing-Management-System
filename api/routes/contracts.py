@@ -119,7 +119,7 @@ def _generate_contract_number() -> str:
 @router.get("", response_model=PaginatedResponse[ContractResponse])
 async def list_contracts(
     page: int = Query(1, ge=1, le=1000),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=25),
     vendor_id: Optional[str] = Query(None),
     contract_status: Optional[str] = Query(None, alias="status"),
     expiring_within_days: Optional[int] = Query(None, ge=1, le=365),

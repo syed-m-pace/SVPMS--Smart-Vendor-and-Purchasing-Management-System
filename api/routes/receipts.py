@@ -66,7 +66,7 @@ async def _get_line_items(db: AsyncSession, receipt_id) -> list[ReceiptLineItem]
 @router.get("", response_model=PaginatedResponse[ReceiptResponse])
 async def list_receipts(
     page: int = Query(1, ge=1, le=1000),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=25),
     po_id: str = Query(None),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),

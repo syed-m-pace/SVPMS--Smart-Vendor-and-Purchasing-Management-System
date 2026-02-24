@@ -58,9 +58,9 @@ export default function ReceiptsPage() {
     async function openUploadDialog() {
         try {
             const [issuedRes, ackRes, partialRes] = await Promise.all([
-                poService.list({ status: "ISSUED", limit: 100 }),
-                poService.list({ status: "ACKNOWLEDGED", limit: 100 }),
-                poService.list({ status: "PARTIALLY_RECEIVED", limit: 100 }),
+                poService.list({ status: "ISSUED", limit: 25 }),
+                poService.list({ status: "ACKNOWLEDGED", limit: 25 }),
+                poService.list({ status: "PARTIALLY_RECEIVED", limit: 25 }),
             ]);
             setIssuedPOs([...issuedRes.data, ...ackRes.data, ...partialRes.data]);
         } catch {

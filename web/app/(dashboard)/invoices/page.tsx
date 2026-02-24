@@ -57,8 +57,8 @@ export default function InvoicesPage() {
     async function openUploadDialog() {
         try {
             const [issuedRes, acknowledgedRes] = await Promise.all([
-                poService.list({ status: "ISSUED", limit: 100 }),
-                poService.list({ status: "ACKNOWLEDGED", limit: 100 }),
+                poService.list({ status: "ISSUED", limit: 25 }),
+                poService.list({ status: "ACKNOWLEDGED", limit: 25 }),
             ]);
             setIssuedPOs([...issuedRes.data, ...acknowledgedRes.data]);
         } catch {

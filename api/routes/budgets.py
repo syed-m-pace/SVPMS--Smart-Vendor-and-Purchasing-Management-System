@@ -51,7 +51,7 @@ def _to_response(b: Budget) -> BudgetResponse:
 @router.get("", response_model=PaginatedResponse[BudgetResponse])
 async def list_budgets(
     page: int = Query(1, ge=1, le=1000),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=25),
     department_id: str = Query(None),
     fiscal_year: int = Query(None),
     quarter: int = Query(None, ge=1, le=4),

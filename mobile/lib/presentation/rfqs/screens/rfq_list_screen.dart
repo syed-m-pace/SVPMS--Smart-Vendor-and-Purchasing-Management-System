@@ -32,6 +32,7 @@ class _RFQListScreenState extends State<RFQListScreen> {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Status filter bar ──
         SingleChildScrollView(

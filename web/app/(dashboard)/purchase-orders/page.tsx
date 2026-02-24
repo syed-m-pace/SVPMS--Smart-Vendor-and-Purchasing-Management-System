@@ -92,7 +92,7 @@ export default function PurchaseOrdersPage() {
     const loadReadyItems = useCallback(async () => {
         setReadyLoading(true);
         try {
-            const r = await poService.ready({ page: 1, limit: 50 });
+            const r = await poService.ready({ page: 1, limit: 25 });
             setReadyItems(r.data);
         } catch {
             toast.error("Failed to load approved PRs ready for PO");
@@ -103,7 +103,7 @@ export default function PurchaseOrdersPage() {
 
     const loadActiveVendors = useCallback(async () => {
         try {
-            const r = await vendorService.list({ page: 1, limit: 100, status: "ACTIVE" });
+            const r = await vendorService.list({ page: 1, limit: 25, status: "ACTIVE" });
             setVendors(r.data);
         } catch {
             toast.error("Failed to load active vendors");

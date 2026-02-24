@@ -98,7 +98,7 @@ async def _build_response(db: AsyncSession, rfq: Rfq, current_user: dict = None)
 @router.get("", response_model=PaginatedResponse[RfqResponse])
 async def list_rfqs(
     page: int = Query(1, ge=1, le=1000),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=25),
     rfq_status: str = Query(None, alias="status"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),

@@ -93,7 +93,7 @@ async def list_approvals(
     entity_type_filter: str = Query(None, alias="entity_type"),
     entity_id_filter: str = Query(None, alias="entity_id"),
     page: int = Query(1, ge=1, le=1000),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=25),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
