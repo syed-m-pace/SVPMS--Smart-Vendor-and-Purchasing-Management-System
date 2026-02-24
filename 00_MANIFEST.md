@@ -12,11 +12,12 @@
 | # | File | Contents |
 |---|------|----------|
 | 1 | `00_MANIFEST.md` | THIS FILE — stack, glossary, cross-references |
-| 2 | `05_AGENT_EXECUTION_GUIDE.md` | **READ SECOND** — 9-phase build plan with verify steps |
+| 2 | `05_AGENT_EXECUTION_GUIDE.md` | **READ SECOND** — 10-phase build plan with verify steps |
 | 3 | `01_BACKEND.md` | DDL (23 tables), API (OpenAPI 40+ endpoints), algorithms, state machines, errors, validation, RBAC, notifications, edge cases, tests, seed data |
-| 4 | `02_FRONTEND_WEB.md` | Next.js 14 — components, Zustand stores, routing, API client |
-| 5 | `03_FRONTEND_MOBILE.md` | Flutter 3.16 — screens, BLoC, Dio client, FCM push client |
+| 4 | `02_FRONTEND_WEB.md` | Next.js 14 Admin Portal — components, Zustand stores, routing, API client |
+| 5 | `03_FRONTEND_MOBILE.md` | Flutter 3.16 Vendor Mobile — screens, BLoC, Dio client, FCM push client |
 | 6 | `04_INFRASTRUCTURE.md` | All boilerplate, Neon/R2/Upstash/FCM server-side/Secrets, Docker, CI/CD |
+| 7 | `06_FRONTEND_VENDOR_WEB.md` | Next.js 14 Vendor Web Portal — pages, components, API client, deployment |
 
 **Core Rules:**
 - All money as `BIGINT` cents, never floats
@@ -33,8 +34,9 @@
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    CLIENT LAYER                       │
-│  Next.js 14 (React/TS)  │  Flutter 3.16 (Dart)      │
-│  Tailwind + shadcn/ui   │  BLoC + Dio + FCM          │
+│  Next.js 14 Admin (web/) │ Next.js 14 Vendor (vendor-web/) │
+│  Flutter 3.16 (mobile/)  │ Tailwind + shadcn/ui + Zustand  │
+│  BLoC + Dio + FCM        │                                  │
 └──────────────┬──────────────────────┬────────────────┘
                │         HTTPS        │
 ┌──────────────▼──────────────────────▼────────────────┐
@@ -64,8 +66,9 @@
 | Secrets (prod) | Google Secret Manager | ✅ ACTIVE |
 | Hosting (prod) | Google Cloud Run | ✅ ACTIVE |
 | Rate Limiting | In-memory (single instance) | ✅ ACTIVE (stub) |
-| Frontend Web | Next.js 14 + TypeScript + Tailwind + shadcn/ui | ✅ ACTIVE |
-| Frontend Mobile | Flutter 3.16 + Dart + BLoC + Dio | ✅ ACTIVE |
+| Frontend Web (Admin) | Next.js 14 + TypeScript + Tailwind + shadcn/ui (`web/`) | ✅ ACTIVE |
+| Frontend Web (Vendor) | Next.js 14 + TypeScript + Tailwind + shadcn/ui (`vendor-web/`) | ✅ ACTIVE |
+| Frontend Mobile (Vendor) | Flutter 3.16 + Dart + BLoC + Dio (`mobile/`) | ✅ ACTIVE |
 | Email | Brevo (Direct API) | ✅ ACTIVE |
 | Payments | **STUB** → Stripe when ready | ⏸️ DEFERRED |
 | Cache/Redis | Upstash Redis (REST API) | ✅ ACTIVE |

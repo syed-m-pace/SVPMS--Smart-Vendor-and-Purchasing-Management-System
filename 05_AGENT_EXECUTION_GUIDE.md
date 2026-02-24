@@ -402,6 +402,62 @@ npm run dev  # localhost:3000
 
 ---
 
+## PHASE 6b: FRONTEND VENDOR WEB (Est. 4-6 hours)
+
+### Goal: Vendor web portal with full mobile app parity + web-specific extras
+
+**Spec reference:** `06_FRONTEND_VENDOR_WEB.md`
+
+```bash
+# 1. Navigate to vendor-web directory (already scaffolded)
+cd svpms/vendor-web
+npm install
+
+# 2. Project is pre-built with:
+#   - 15 pages: login, dashboard, PO list/detail, RFQ list/detail/bid/history,
+#     invoice list/upload/detail, contracts, analytics, notifications, profile
+#   - Shared components: Sidebar, Navbar, DataTable, StatusBadge, EmptyState
+#   - API client with JWT interceptors (same pattern as admin web)
+#   - Zustand auth store with vendor profile
+#   - Zod validation schemas for forms
+
+# 3. Update backend CORS
+# In .env, add http://localhost:3001 to CORS_ORIGINS
+
+# 4. Run
+npm run dev  # localhost:3001
+
+# VERIFY:
+# - Open http://localhost:3001
+# - Login with sales@alphasupplies.com / SvpmsTest123!
+# - Dashboard loads with KPI stats + scorecard
+# - Can view PO list, open detail, acknowledge with delivery date
+# - Can view RFQs, submit a bid, see bid history
+# - Can upload an invoice with file attachment
+# - Can view invoice detail with OCR/match status
+# - Can dispute an EXCEPTION invoice
+# - Can export PO/invoice lists as CSV
+# - Can view contracts and analytics pages
+# - Profile shows vendor info, can change password
+# - Notifications page shows inbox
+```
+
+### ✅ Phase 6b Checklist
+- [ ] Vendor login works (rejects non-vendor accounts)
+- [ ] Dashboard shows Active POs, Pending RFQs, Open Invoices, Exceptions
+- [ ] PO acknowledge flow works (ISSUED → ACKNOWLEDGED)
+- [ ] RFQ bid submission works
+- [ ] Invoice upload with file attachment works
+- [ ] Invoice dispute works for EXCEPTION status
+- [ ] CSV export works on PO and invoice list pages
+- [ ] Contracts and analytics pages load
+- [ ] Profile shows vendor details with masked bank account
+- [ ] Change password works
+- [ ] Sign out clears tokens and redirects to login
+- [ ] Responsive sidebar collapses on small screens
+
+---
+
 ## PHASE 7: FRONTEND MOBILE (Est. 6-8 hours)
 
 ### Goal: Flutter app connects to local API, core screens functional, push notifications work

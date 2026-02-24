@@ -28,6 +28,7 @@
 - **Production Hardening COMPLETE** (20 critical/high issues fixed): DEBUG=False, random vendor password, internal job auth, file tenant isolation, OCR async, rate limit X-Forwarded-For, CORS methods restricted, self-approval bypass fixed, N+1 queries fixed, all explicit db.commit() → db.flush()
 - **Functional Completeness Fixes COMPLETE** (14 fixes — budget spent_cents, invoice APPROVED/PAID, PO close, RFQ cancel, exception notify, receipt triggers match, audit log route, approvals entity filter, dashboard KPIs, invoice upload UI, invoice payment buttons, approval chain on PR, mobile dispute, iOS notifications)
 - **Server Latency Optimization COMPLETE** (8 fixes — NullPool→QueuePool pool_size=2, httpx singleton, rate limiter pipeline+skip /internal/, batch invoices/receipts/rfqs/approvals N+1, DB indexes migrated c9e1f2a3b4d5)
+- Phase 6b: Frontend Vendor Web **COMPLETE** (15 pages, 40 components — dashboard, POs, RFQs+bids, invoices+upload+dispute, contracts, analytics, notifications, profile)
 - Phase 5-9: Not started
 
 ## Post-Launch Bug Fixes (Phase 4)
@@ -65,7 +66,6 @@
 - **Thresholds (cents)**: <5M = manager, 5M-20M = +finance_head, >=20M = +CFO
 - **Notifications**: Resolve emails during request, dispatch via BackgroundTasks (fire-and-forget)
 - **No explicit db.commit()**: Let get_db() auto-commit for atomicity
-- **Dashboard Stats**: Replaced multiple list API fetches with a dedicated `/api/v1/dashboard/stats` endpoint using concurrent `COUNT` and `SUM` queries. This optimized route serves both Web and Mobile, providing all required KPIs (including mobile-specific `open_invoices` and `pending_rfqs`) in a single low-latency response.
 
 ## Seed Data (key UUIDs for testing)
 - Tenant ACME: `a0000000-0000-0000-0000-000000000001`
@@ -95,6 +95,11 @@
 - Middleware: `api/middleware/` (auth, tenant, authorization)
 - DB: `api/database.py` (get_db with auto-commit/rollback, set_tenant_context)
 - Config: `api/config.py` (Settings with extra="ignore")
+- Vendor Web: `vendor-web/` (Next.js 14, port 3001)
+- Vendor Web Pages: `vendor-web/app/(portal)/{entity}/page.tsx`
+- Vendor Web API: `vendor-web/lib/api/{entity}.ts`
+- Vendor Web Stores: `vendor-web/lib/stores/{auth,ui}.ts`
+- Vendor Web PRD: `06_FRONTEND_VENDOR_WEB.md`
 
 ## Invoice State Machine (full)
 - UPLOADED → (OCR+match) → MATCHED or EXCEPTION
@@ -111,3 +116,75 @@
 - Audit log: `GET /api/v1/audit-logs` with entity_type/entity_id/actor_id filters
 - Approvals: `entity_type` + `entity_id` query params; privileged roles see all (not just their own)
 - Mobile: `DisputeInvoice` BLoC event + dialog in invoice_detail_screen; iOS notifications fixed
+
+## Production-Readiness Review — STATUS: ALL P0/P1/P2 COMPLETE (2026-02-24)
+Full plan: `/Users/pacewisdom/.claude/plans/snazzy-greeting-stonebraker.md`
+Benchmarked against: Coupa, SAP Ariba, Jaggaer, Procurify, Tradogram
+
+### Current Scores
+- Backend: 7/10, Security: 5/10, Web: 2/10, Mobile: 8/10, Tests: 3/10, Market Features: 4/10
+
+### Active Work (P0 + P1 + P2 only; P3 deferred)
+**Deferred:** P0-1 (Secret Manager), P0-2 (mobile demo creds), P1-2 (dept soft delete), P1-7 (account lockout), P3 (all)
+
+**P0 Quick Fixes:**
+- P0-3: Disable /docs when DEBUG=False → `api/main.py`
+- P0-4: Fix CORS localhost → production domain in `.env`
+- P0-5: Web admin MVP (PR, PO, Invoice, Vendor, Approval pages)
+- P0-6: Unit tests for budget_service, approval_service, notification_service, ocr, 3-way match
+
+**P1 Backend Fixes:**
+- P1-1: Tenant ID f-string → parameterized `set_config()` in `api/database.py:59`
+- P1-3: Complete approval escalation job in `api/routes/scheduled.py`
+- P1-4: Fix document expiry notification (TODO comment) in `api/routes/scheduled.py:79`
+- P1-5: Remove undefined "viewer" role from `api/routes/purchase_requests.py:116`
+- P1-6: Global exception handler for consistent error format in `api/main.py`
+- P1-8: Add role/dept filter to dashboard stats in `api/routes/dashboard.py`
+- P1-9: Add retry/logging on background notification failure
+- P1-10: Extend /health to check DB + Redis + R2
+- P1-11: Replace `body: dict` with typed schema in `api/routes/users.py:136`
+- P1-12: Extract `_resolve_vendor_for_user` to `api/services/vendor_service.py`
+- P1-13: Pin bcrypt version in requirements.txt
+- P1-14: Pin Flutter SDK version
+- P1-15: Full E2E test suite (PR→PO→Receipt→Invoice→Pay)
+
+**P2 Market Features — ALL DONE:**
+- P2-1: ✅ Supplier scorecard engine → `api/services/scorecard_service.py` + `GET /vendors/{id}/scorecard`
+- P2-2: ✅ Spend analytics → `api/routes/analytics.py` + `GET /analytics/spend`
+- P2-3: ✅ Multi-currency → `api/models/fx_rate.py`, `api/services/currency_service.py`, `api/routes/fx_rates.py`, migration a1b2c3d4e5f6
+- P2-4: ✅ Contract management → `api/models/contract.py`, `api/routes/contracts.py`, migration b2c3d4e5f6a7
+- P2-5: ✅ Vendor risk scoring → `api/services/risk_score_service.py` + `POST /vendors/{id}/refresh-risk-score`
+- P2-6: ✅ Idempotency middleware → `api/middleware/idempotency.py` (Hive key per tenant, 24h TTL)
+- P2-7: ✅ Audit log date range + CSV export → updated `api/routes/audit_logs.py` (from_date/to_date + GET /export)
+- P2-8: ✅ Stripe webhook validation → `api/routes/webhooks.py` (POST /webhooks/stripe with stripe.Webhook.construct_event)
+- P2-9: Deferred (P1-7 hold)
+- P2-10: ✅ Mobile RFQ detail → `mobile/lib/presentation/rfqs/screens/rfq_detail_screen.dart`
+- P2-11: ✅ Mobile notifications inbox → `mobile/lib/presentation/notifications/screens/notifications_screen.dart` + Hive persistence in NotificationService
+- P2-12: ✅ FCM stale token cleanup → `POST /internal/jobs/cleanup-fcm-tokens` in scheduled.py (deactivates after 30 days inactive)
+- P2-13: Not implemented (Cloud Monitoring config, not code)
+- P2-14: ✅ Role-based rate limiting → `api/middleware/rate_limit.py` (privileged=500/min, internal=200/min, vendor=60/min)
+- P2-15: Not implemented (Firebase IAM config, not code)
+
+**New files added in P2:**
+- `api/services/risk_score_service.py` — vendor risk score 0-100 (doc expiry 30%, invoice exceptions 35%, delivery 35%)
+- `api/services/currency_service.py` — FX lookup + cents conversion
+- `api/services/scorecard_service.py` — vendor KPI scorecard
+- `api/middleware/idempotency.py` — POST dedup via Redis; uses `cache.setnx()`
+- `api/routes/analytics.py` — spend analytics
+- `api/routes/fx_rates.py` — FX rate CRUD
+- `api/routes/contracts.py` — contract lifecycle (DRAFT→ACTIVE→TERMINATED)
+- `api/routes/webhooks.py` — Stripe webhook with signature validation
+- `api/models/contract.py`, `api/models/fx_rate.py`
+- `mobile/lib/presentation/rfqs/screens/rfq_detail_screen.dart`
+- `mobile/lib/presentation/notifications/screens/notifications_screen.dart`
+
+**Cache client additions (api/services/cache.py):**
+- `setnx(key, value, ex)` — SET NX EX via Upstash REST, returns True if acquired
+- `ping()` — PING health check (was missing, used in /health endpoint)
+
+### Key Missing Market Features (vs Coupa/Ariba/Jaggaer)
+- Supplier Scorecards (on-time delivery %, invoice acceptance rate)
+- Contract Management (first-class entity, renewal alerts)
+- Vendor Risk Scoring (doc expiry + exception rate + delivery performance)
+- Spend Analytics (by dept/vendor/category, budget vs actual)
+- Multi-currency support (INR only currently)
