@@ -118,16 +118,17 @@ async def list_rfqs(
         scoped_vendor = vendor_result.scalar_one_or_none()
         if not scoped_vendor:
             return PaginatedResponse(data=[], pagination=build_pagination(page, limit, 0))
-        # Build vendor_filter incorporating rfq_status to avoid stripping AWARDED RFQs
-        awarded_clause = (Rfq.status == "AWARDED") & (Rfq.awarded_vendor_id == scoped_vendor.id)
+        # Vendors see OPEN (all) + AWARDED (all) — they were notified about all RFQs
         if rfq_status == "AWARDED":
-            vendor_filter = awarded_clause
-        elif rfq_status and rfq_status != "OPEN":
+            vendor_filter = Rfq.status == "AWARDED"
+        elif rfq_status == "OPEN":
+            vendor_filter = Rfq.status == "OPEN"
+        elif rfq_status and rfq_status not in ("OPEN", "AWARDED"):
             # CLOSED/DRAFT/CANCELLED — vendors never see these
             return PaginatedResponse(data=[], pagination=build_pagination(page, limit, 0))
         else:
-            # No filter or "OPEN": always show OPEN + vendor's AWARDED
-            vendor_filter = or_(Rfq.status == "OPEN", awarded_clause)
+            # No filter (ALL): show OPEN + AWARDED
+            vendor_filter = Rfq.status.in_(["OPEN", "AWARDED"])
         q = q.where(vendor_filter)
         count_q = count_q.where(vendor_filter)
     elif rfq_status:

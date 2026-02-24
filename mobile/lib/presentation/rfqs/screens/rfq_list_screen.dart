@@ -105,7 +105,9 @@ class _RFQListScreenState extends State<RFQListScreen> {
                     itemBuilder: (context, i) {
                       final rfq = state.rfqs[i];
                       final isAwarded = rfq.status == 'AWARDED';
-                      final hasWonPo = isAwarded && rfq.awardedPoId != null;
+                      final myVendorId = rfq.bids.isNotEmpty ? rfq.bids.first.vendorId : null;
+                      final hasWonPo = isAwarded && myVendorId != null && rfq.awardedVendorId == myVendorId;
+                      final hasLost = isAwarded && myVendorId != null && rfq.awardedVendorId != myVendorId;
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -155,6 +157,27 @@ class _RFQListScreenState extends State<RFQListScreen> {
                                         '🏆 You Won — Tap to view PO',
                                         style: TextStyle(
                                           color: AppColors.success,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  else if (hasLost)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'Awarded to another vendor',
+                                        style: TextStyle(
+                                          color: AppColors.error,
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                         ),

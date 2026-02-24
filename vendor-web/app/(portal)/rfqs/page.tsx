@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { rfqService } from "@/lib/api/rfqs";
+import { useAuthStore } from "@/lib/stores/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { RFQ } from "@/types/models";
 
@@ -15,6 +16,7 @@ const STATUS_FILTERS = ["ALL", "OPEN", "AWARDED", "CLOSED"];
 
 export default function RFQsPage() {
     const router = useRouter();
+    const vendor = useAuthStore((s) => s.vendor);
     const [data, setData] = useState<RFQ[]>([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -91,8 +93,14 @@ export default function RFQsPage() {
                         header: "Bid",
                         cell: (row) => {
                             const myBid = row.bids?.find((b) => b.vendor_id);
-                            if (row.status === "AWARDED" && row.awarded_vendor_id) {
-                                return <span className="text-sm font-medium text-success">Won</span>;
+                            if (row.status === "AWARDED") {
+                                if (row.awarded_vendor_id === vendor?.id) {
+                                    return <span className="text-sm font-medium text-success">Won</span>;
+                                }
+                                if (myBid) {
+                                    return <span className="text-sm font-medium text-destructive">Lost</span>;
+                                }
+                                return <span className="text-sm text-muted-foreground">Awarded</span>;
                             }
                             if (myBid) {
                                 return <span className="text-sm text-accent">Bid Submitted</span>;

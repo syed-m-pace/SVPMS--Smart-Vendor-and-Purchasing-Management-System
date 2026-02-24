@@ -6,6 +6,7 @@ import { Bell, Menu, ChevronRight } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useUIStore } from "@/lib/stores/ui";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 
 const breadcrumbMap: Record<string, string> = {
     "/": "Dashboard",
@@ -22,6 +23,7 @@ const breadcrumbMap: Record<string, string> = {
 
 export function Navbar() {
     const user = useAuthStore((s) => s.user);
+    const vendor = useAuthStore((s) => s.vendor);
     const toggleSidebar = useUIStore((s) => s.toggleSidebar);
     const pathname = usePathname();
 
@@ -73,13 +75,17 @@ export function Navbar() {
                     </Button>
                 </Link>
 
+                {vendor?.status && (
+                    <StatusBadge status={vendor.status} />
+                )}
+
                 {user && (
                     <div className="hidden sm:flex items-center gap-3 border-l pl-3">
                         <div className="text-right">
                             <p className="text-sm font-medium">
                                 {user.first_name} {user.last_name}
                             </p>
-                            <p className="text-xs text-muted-foreground">Vendor</p>
+                            <p className="text-xs text-muted-foreground">{vendor?.legal_name || "Vendor"}</p>
                         </div>
                     </div>
                 )}
