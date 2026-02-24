@@ -4,7 +4,8 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, cast, func, or_, select
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
@@ -103,7 +104,9 @@ async def list_vendors(
 
     # Admins can see all non-draft vendors, but only their own draft vendors.
     if current_user["role"] == "admin":
-        own_draft_vendor_ids = select(AuditLog.entity_id).where(
+        own_draft_vendor_ids = select(
+            cast(AuditLog.entity_id, PG_UUID(as_uuid=True))
+        ).where(
             AuditLog.entity_type == "VENDOR",
             AuditLog.action == "VENDOR_CREATED",
             AuditLog.actor_id == current_user["user_id"],

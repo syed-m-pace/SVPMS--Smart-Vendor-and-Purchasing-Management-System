@@ -37,10 +37,12 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: Optional[str] = None
     GCP_PROJECT_ID: str = ""
     DOCUMENT_AI_PROCESSOR: Optional[str] = None
-    USE_SECRET_MANAGER: bool = False
-
+    USE_SECRET_MANAGER: bool = False # --- Notifications / Email ---
+    FCM_PROJECT_ID: Optional[str] = None
+    MAILTRAP_API_KEY: Optional[str] = None
+    MAILTRAP_INBOX_ID: Optional[str] = "4406408"
     BREVO_API_KEY: Optional[str] = None
-    EMAIL_FROM_ADDRESS: str = "noreply@svpms.example.com"
+    EMAIL_FROM_ADDRESS: str = "noreply@svpms.local"
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_JOB_SECRET: Optional[str] = None  # Required in production for /internal/jobs/* auth

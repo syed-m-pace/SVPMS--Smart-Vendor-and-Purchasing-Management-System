@@ -16,7 +16,13 @@ class RFQListScreen extends StatefulWidget {
 class _RFQListScreenState extends State<RFQListScreen> {
   String? _selectedStatus;
 
-  static const _statuses = ['DRAFT', 'OPEN', 'CLOSED', 'AWARDED'];
+  static const _statuses = ['OPEN', 'AWARDED'];
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<RFQBloc>().add(LoadRFQs());
+  }
 
   void _applyFilter(String? status) {
     setState(() => _selectedStatus = status);

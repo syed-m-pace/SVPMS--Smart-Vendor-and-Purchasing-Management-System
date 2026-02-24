@@ -32,4 +32,5 @@ class Department(Base):
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "code", name="uq_department_tenant_code"),
+        UniqueConstraint("tenant_id", "name", name="uq_department_tenant_name"),
     )

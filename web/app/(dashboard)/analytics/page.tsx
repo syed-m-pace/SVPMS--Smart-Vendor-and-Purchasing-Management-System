@@ -103,7 +103,7 @@ export default function AnalyticsPage() {
     const [pos, setPos] = useState<PurchaseOrder[]>([]);
 
     useEffect(() => {
-        Promise.all([
+        Promise.allSettled([
             budgetService.list({ limit: 100 }),
             invoiceService.list({ limit: 100 }),
             vendorService.list({ limit: 100 }),
@@ -111,13 +111,12 @@ export default function AnalyticsPage() {
             poService.list({ limit: 100 }),
         ])
             .then(([b, inv, v, pr, po]) => {
-                setBudgets(b.data);
-                setInvoices(inv.data);
-                setVendors(v.data);
-                setPrs(pr.data);
-                setPos(po.data);
+                setBudgets(b.status === "fulfilled" ? b.value.data : []);
+                setInvoices(inv.status === "fulfilled" ? inv.value.data : []);
+                setVendors(v.status === "fulfilled" ? v.value.data : []);
+                setPrs(pr.status === "fulfilled" ? pr.value.data : []);
+                setPos(po.status === "fulfilled" ? po.value.data : []);
             })
-            .catch(console.error)
             .finally(() => setLoading(false));
     }, []);
 

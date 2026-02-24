@@ -39,6 +39,15 @@ async def get_dashboard_stats(
     vendor_obj = None
     if is_vendor:
         vendor_obj = await resolve_vendor_for_user(db, current_user)
+        if not vendor_obj:
+            return {
+                "pending_prs": 0,
+                "active_pos": 0,
+                "invoice_exceptions": 0,
+                "open_invoices": 0,
+                "pending_rfqs": 0,
+                "budget_utilization": 0,
+            }
 
     # -----------------------------------------------------------------------
     # 1. Pending PRs
