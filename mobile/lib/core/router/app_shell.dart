@@ -78,67 +78,70 @@ class _AppShellState extends State<AppShell> {
           });
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(_title(index)),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              tooltip: 'Notifications',
-              onPressed: () => context.push('/notifications'),
-            ),
-            FutureBuilder<Vendor>(
-              future: _vendorFuture,
-              builder: (context, snapshot) {
-                if (snapshot.hasData && snapshot.data?.status != null) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: Center(
-                      child: StatusBadge(status: snapshot.data!.status),
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ],
-        ),
-        body: widget.child,
-        floatingActionButton: index == 3
-            ? FloatingActionButton(
-                onPressed: () => context.push('/invoices/upload'),
-                tooltip: 'Upload Invoice',
-                child: const Icon(Icons.upload),
-              )
-            : null,
-        bottomNavigationBar: MediaQuery.removePadding(
-          context: context,
-          removeBottom: true,
-          child: BottomNavigationBar(
-            elevation: 0,
-            backgroundColor: AppColors.background,
-            type: BottomNavigationBarType.fixed,
-            currentIndex: index,
-            onTap: (i) => context.go(_tabs[i]),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard),
-                label: 'Dashboard',
+      child: SafeArea(
+        top: false,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(_title(index)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                tooltip: 'Notifications',
+                onPressed: () => context.push('/notifications'),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_cart),
-                label: 'Orders',
-              ),
-              BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'RFQs'),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.receipt_long),
-                label: 'Invoices',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profile',
+              FutureBuilder<Vendor>(
+                future: _vendorFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data?.status != null) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: Center(
+                        child: StatusBadge(status: snapshot.data!.status),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
               ),
             ],
+          ),
+          body: widget.child,
+          floatingActionButton: index == 3
+              ? FloatingActionButton(
+                  onPressed: () => context.push('/invoices/upload'),
+                  tooltip: 'Upload Invoice',
+                  child: const Icon(Icons.upload),
+                )
+              : null,
+          bottomNavigationBar: MediaQuery.removePadding(
+            context: context,
+            removeBottom: true,
+            child: BottomNavigationBar(
+              elevation: 0,
+              backgroundColor: AppColors.background,
+              type: BottomNavigationBarType.fixed,
+              currentIndex: index,
+              onTap: (i) => context.go(_tabs[i]),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.shopping_cart),
+                  label: 'Orders',
+                ),
+                BottomNavigationBarItem(icon: Icon(Icons.gavel), label: 'RFQs'),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.receipt_long),
+                  label: 'Invoices',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ],
+            ),
           ),
         ),
       ),

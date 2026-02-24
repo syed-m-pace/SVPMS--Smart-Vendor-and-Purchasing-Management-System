@@ -24,13 +24,13 @@ class AppNotification {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'body': body,
-        'type': type,
-        'deepLinkPath': deepLinkPath,
-        'receivedAt': receivedAt.toIso8601String(),
-      };
+    'id': id,
+    'title': title,
+    'body': body,
+    'type': type,
+    'deepLinkPath': deepLinkPath,
+    'receivedAt': receivedAt.toIso8601String(),
+  };
 
   factory AppNotification.fromJson(Map<String, dynamic> json) =>
       AppNotification(
@@ -39,7 +39,8 @@ class AppNotification {
         body: json['body'] ?? '',
         type: json['type'] ?? 'GENERIC',
         deepLinkPath: json['deepLinkPath'],
-        receivedAt: DateTime.tryParse(json['receivedAt'] ?? '') ?? DateTime.now(),
+        receivedAt:
+            DateTime.tryParse(json['receivedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -80,17 +81,16 @@ class NotificationService {
     );
 
     // 2. Init Local Notifications
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
     await _localNotifications.initialize(
-      const InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      ),
+      const InitializationSettings(android: androidSettings, iOS: iosSettings),
     );
 
     // 3. Foreground Message Handler
@@ -134,7 +134,9 @@ class NotificationService {
       final id = data['id'] ?? data['po_id'] ?? data['rfq_id'];
 
       final appNotif = AppNotification(
-        id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        id:
+            message.messageId ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
         title: notification?.title ?? _defaultTitle(type),
         body: notification?.body ?? '',
         type: type,
@@ -176,7 +178,7 @@ class NotificationService {
     }
   }
 
-  int _unreadCount = 0;
+  final int _unreadCount = 0;
   int get unreadCount => _unreadCount;
 
   // ─── Deep Link Routing ────────────────────────────────────────────────────
@@ -233,7 +235,8 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'high_importance_channel',
           'High Importance Notifications',
-          channelDescription: 'This channel is used for important notifications.',
+          channelDescription:
+              'This channel is used for important notifications.',
           importance: Importance.max,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
