@@ -92,7 +92,7 @@ class RFQDetailScreen extends StatelessWidget {
                           if (rfq.budgetCents != null)
                             _row(
                               'Budget',
-                              formatCurrency(rfq.budgetCents!, currency: 'INR'),
+                              formatCurrency(rfq.budgetCents!),
                             ),
                           if (rfq.description != null &&
                               rfq.description!.isNotEmpty) ...[
@@ -236,10 +236,7 @@ class RFQDetailScreen extends StatelessWidget {
                             if (isAwarded) const SizedBox(height: 12),
                             _row(
                               'Bid Amount',
-                              formatCurrency(
-                                myBid.totalCents,
-                                currency: 'INR',
-                              ),
+                              formatCurrency(myBid.totalCents),
                             ),
                             if (myBid.deliveryDays != null)
                               _row(
