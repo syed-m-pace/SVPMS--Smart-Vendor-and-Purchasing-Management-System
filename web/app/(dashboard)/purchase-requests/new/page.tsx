@@ -46,18 +46,14 @@ export default function NewPurchaseRequestPage() {
         },
     });
 
-    console.log("Current Dept:", watch("department_id"));
-    console.log("Errors:", errors);
-
     const { fields, append, remove } = useFieldArray({ control, name: "line_items" });
     const lineItems = watch("line_items");
     const total = lineItems.reduce((sum, li) => sum + (li.quantity || 0) * (li.unit_price_cents || 0), 0);
 
     useEffect(() => {
         departmentService.list().then((r) => {
-            console.log("Departments loaded:", r.data);
             setDepartments(r.data);
-        }).catch((err) => console.error("Failed to load departments", err));
+        }).catch(() => { });
     }, []);
 
     async function onSubmit(data: PRForm) {

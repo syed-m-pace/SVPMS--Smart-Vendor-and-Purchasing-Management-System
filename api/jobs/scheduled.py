@@ -19,6 +19,7 @@ import structlog
 from api.database import get_db
 from api.models.approval import Approval
 from api.models.budget import Budget, BudgetReservation
+from api.models.department import Department
 from api.models.user import User
 from api.models.user_device import UserDevice
 from api.models.vendor import Vendor, VendorDocument
@@ -59,9 +60,10 @@ async def check_document_expiry(
     db: AsyncSession = Depends(get_db),
     _auth: None = Depends(_require_internal_auth),
 ):
-    """Daily: Check vendor documents nearing expiry (30-day window) and notify vendors."""
+    """Daily: Check vendor documents nearing expiry and notify at 30, 14, 7, 3 day thresholds."""
     today = date.today()
     expiry_cutoff = today + timedelta(days=30)
+    escalation_thresholds = {30, 14, 7, 3}
 
     # Join with Vendor to get contact email and name in a single query
     result = await db.execute(
@@ -78,12 +80,16 @@ async def check_document_expiry(
     count = 0
     for doc, vendor_email, vendor_name in rows:
         days_remaining = (doc.expiry_date - today).days
+        # Only send on escalation threshold days (30, 14, 7, 3)
+        if days_remaining not in escalation_thresholds:
+            continue
         logger.info(
             "document_expiring",
             vendor_id=str(doc.vendor_id),
             document_type=doc.document_type,
             days_remaining=days_remaining,
         )
+        urgency = "URGENT" if days_remaining <= 7 else "WARNING"
         background_tasks.add_task(
             send_notification,
             "document_expiry",
@@ -93,6 +99,7 @@ async def check_document_expiry(
                 "document_type": doc.document_type,
                 "days_remaining": days_remaining,
                 "expiry_date": doc.expiry_date.strftime("%Y-%m-%d"),
+                "urgency": urgency,
             },
         )
         count += 1
@@ -184,8 +191,10 @@ async def budget_utilization_alerts(
         reserved = reserved_result.scalar() or 0
         utilization = (budget.spent_cents + reserved) / budget.total_cents
 
+        alert_level = None
         if utilization >= 0.95:
             alerts["critical_95"] += 1
+            alert_level = "CRITICAL"
             logger.warning(
                 "budget_near_exhaustion",
                 budget_id=str(budget.id),
@@ -193,11 +202,51 @@ async def budget_utilization_alerts(
             )
         elif utilization >= 0.80:
             alerts["warning_80"] += 1
+            alert_level = "WARNING"
             logger.info(
                 "budget_threshold_warning",
                 budget_id=str(budget.id),
                 utilization_pct=round(utilization * 100, 1),
             )
+
+        # Send email notification to department manager + finance roles
+        if alert_level:
+            notify_emails = []
+            # Get department manager email
+            dept_result = await db.execute(
+                select(Department, User.email)
+                .join(User, Department.manager_id == User.id, isouter=True)
+                .where(Department.id == budget.department_id)
+            )
+            dept_row = dept_result.one_or_none()
+            if dept_row and dept_row[1]:
+                notify_emails.append(dept_row[1])
+
+            # Get finance_head email
+            finance_result = await db.execute(
+                select(User.email).where(
+                    User.tenant_id == budget.tenant_id,
+                    User.role == "finance_head",
+                    User.is_active == True,  # noqa: E712
+                )
+            )
+            for row in finance_result.all():
+                if row[0] and row[0] not in notify_emails:
+                    notify_emails.append(row[0])
+
+            if notify_emails:
+                background_tasks.add_task(
+                    send_notification,
+                    "budget_alert",
+                    notify_emails,
+                    {
+                        "budget_name": budget.name if hasattr(budget, "name") else str(budget.id),
+                        "alert_level": alert_level,
+                        "utilization_pct": round(utilization * 100, 1),
+                        "spent_cents": budget.spent_cents,
+                        "total_cents": budget.total_cents,
+                    },
+                )
 
     logger.info("budget_alert_check_complete", alerts=alerts)
     return {"checked": len(budgets), "alerts": alerts}

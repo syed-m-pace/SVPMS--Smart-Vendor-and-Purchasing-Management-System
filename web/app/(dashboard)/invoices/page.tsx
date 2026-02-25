@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload } from "lucide-react";
+import { Upload, Search } from "lucide-react";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -46,13 +46,22 @@ export default function InvoicesPage() {
     const [formInvoiceDate, setFormInvoiceDate] = useState("");
     const [formAmount, setFormAmount] = useState("");
     const [formFile, setFormFile] = useState<File | null>(null);
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
 
     useEffect(() => {
-        invoiceService.list({ page }).then((r) => {
+        invoiceService.list({ page, status: statusFilter || undefined }).then((r) => {
             setInvoices(r.data);
             setTotalPages(r.pagination.total_pages);
         }).catch(() => { }).finally(() => setLoading(false));
-    }, [page]);
+    }, [page, statusFilter]);
+
+    const filteredInvoices = search
+        ? invoices.filter((inv) =>
+            inv.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
+            inv.vendor_name?.toLowerCase().includes(search.toLowerCase())
+        )
+        : invoices;
 
     async function openUploadDialog() {
         try {
@@ -134,12 +143,22 @@ export default function InvoicesPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
                     <p className="text-muted-foreground mt-1">Track and manage invoices</p>
                 </div>
-                <Button onClick={openUploadDialog}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Invoice
-                </Button>
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search invoices..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-[200px]" />
+                    </div>
+                    <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none pr-8" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}>
+                        <option value="">All Statuses</option>
+                        {["UPLOADED", "MATCHED", "EXCEPTION", "DISPUTED", "APPROVED", "PAID"].map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <Button onClick={openUploadDialog}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Invoice
+                    </Button>
+                </div>
             </div>
-            <DataTable columns={columns} data={invoices} loading={loading} page={page} totalPages={totalPages} onPageChange={setPage} onRowClick={(inv) => router.push(`/invoices/${inv.id}`)} />
+            <DataTable columns={columns} data={filteredInvoices} loading={loading} page={page} totalPages={totalPages} onPageChange={setPage} onRowClick={(inv) => router.push(`/invoices/${inv.id}`)} />
 
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                 <DialogContent className="sm:max-w-md">

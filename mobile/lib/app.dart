@@ -62,6 +62,11 @@ class SVPMSApp extends StatelessWidget {
     // Create AuthBloc first — router needs it for refreshListenable
     final authBloc = AuthBloc(repo: authRepo)..add(CheckAuth());
 
+    // Redirect to login when token refresh fails (session expired)
+    apiClient.setOnAuthFailure(() {
+      authBloc.add(LogoutRequested());
+    });
+
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<StorageService>.value(value: storage),

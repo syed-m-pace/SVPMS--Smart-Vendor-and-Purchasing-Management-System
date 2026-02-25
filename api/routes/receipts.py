@@ -11,12 +11,15 @@ from api.middleware.authorization import require_roles
 from api.models.invoice import Invoice
 from api.models.receipt import Receipt, ReceiptLineItem
 from api.models.purchase_order import PurchaseOrder, PoLineItem
+from api.models.user import User
 from api.schemas.receipt import (
     ReceiptCreate,
     ReceiptResponse,
     ReceiptLineItemResponse,
 )
 from api.schemas.common import PaginatedResponse, build_pagination
+from api.services.audit_service import create_audit_log
+from api.services.notification_service import send_notification
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -209,6 +212,42 @@ async def create_receipt(
     await db.refresh(receipt)
     line_items = await _get_line_items(db, receipt.id)
     logger.info("receipt_created", receipt_id=str(receipt.id), po_id=str(po.id))
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="RECEIPT_CREATED",
+        entity_type="RECEIPT",
+        entity_id=str(receipt.id),
+        after_state={
+            "receipt_number": receipt.receipt_number,
+            "po_id": str(po.id),
+            "po_status": po.status,
+        },
+        actor_email=current_user.get("email"),
+    )
+
+    # Notify finance roles about goods received
+    finance_result = await db.execute(
+        select(User.email).where(
+            User.tenant_id == current_user["tenant_id"],
+            User.role.in_(["finance_head", "finance"]),
+            User.is_active == True,  # noqa: E712
+        )
+    )
+    finance_emails = [row[0] for row in finance_result.all() if row[0]]
+    if finance_emails:
+        background_tasks.add_task(
+            send_notification,
+            "goods_received",
+            finance_emails,
+            {
+                "receipt_number": receipt.receipt_number,
+                "po_number": po.po_number if hasattr(po, "po_number") else str(po.id),
+                "po_status": po.status,
+            },
+        )
 
     # Trigger 3-way match for any open invoices against this PO
     from api.jobs.three_way_match import run_three_way_match

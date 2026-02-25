@@ -12,6 +12,7 @@ from api.models.rfq import Rfq, RfqLineItem, RfqBid
 from api.models.vendor import Vendor
 from api.models.user import User
 from api.models.purchase_order import PurchaseOrder, PoLineItem
+from api.services.audit_service import create_audit_log
 from api.services.notification_service import send_notification
 from api.services.push_service import send_push
 from api.schemas.rfq import (
@@ -67,15 +68,13 @@ async def _build_response(db: AsyncSession, rfq: Rfq, current_user: dict = None)
     bids_query = select(RfqBid).where(RfqBid.rfq_id == rfq.id).order_by(RfqBid.total_cents)
     
     if current_user and current_user.get("role") == "vendor":
-        from api.models.vendor import Vendor
-        vendor_result = await db.execute(
-            select(Vendor).where(Vendor.email == current_user["email"])
-        )
-        vendor = vendor_result.scalar_one_or_none()
+        from api.services.vendor_service import resolve_vendor_for_user
+        vendor = await resolve_vendor_for_user(db, current_user)
         if vendor:
             bids_query = bids_query.where(RfqBid.vendor_id == str(vendor.id))
         else:
-            bids_query = bids_query.where(RfqBid.vendor_id == "00000000-0000-0000-0000-000000000000")
+            # No vendor record — return RFQ with empty bids
+            bids_query = bids_query.where(False)
             
     bids_result = await db.execute(bids_query)
     return RfqResponse(
@@ -207,6 +206,13 @@ async def create_rfq(
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
+    # Validate line items present
+    if not body.line_items:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one line item is required for an RFQ",
+        )
+
     # Parse deadline
     try:
         deadline = datetime.fromisoformat(body.deadline.replace('Z', '+00:00'))
@@ -216,6 +222,14 @@ async def create_rfq(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid deadline format (use ISO 8601)",
+        )
+
+    # Deadline must be at least 24 hours in the future
+    from datetime import timedelta
+    if deadline < datetime.utcnow() + timedelta(hours=24):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="RFQ deadline must be at least 24 hours in the future",
         )
 
     rfq_number = await _generate_rfq_number(db)
@@ -243,6 +257,17 @@ async def create_rfq(
 
     await db.flush()
     logger.info("rfq_created", rfq_id=str(rfq.id), rfq_number=rfq.rfq_number)
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="RFQ_CREATED",
+        entity_type="RFQ",
+        entity_id=str(rfq.id),
+        after_state={"rfq_number": rfq.rfq_number, "title": rfq.title, "status": "OPEN"},
+        actor_email=current_user.get("email"),
+    )
 
     # Notify all active vendors in the tenant
     vendor_result = await db.execute(
@@ -336,9 +361,23 @@ async def cancel_rfq(
             detail=f"Cannot cancel RFQ in '{rfq.status}' status (must be OPEN or CLOSED)",
         )
 
+    before_status = rfq.status
     rfq.status = "CANCELLED"
     await db.flush()
     logger.info("rfq_cancelled", rfq_id=rfq_id, by=current_user["user_id"])
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="RFQ_CANCELLED",
+        entity_type="RFQ",
+        entity_id=rfq_id,
+        before_state={"status": before_status},
+        after_state={"status": "CANCELLED"},
+        actor_email=current_user.get("email"),
+    )
+
     return await _build_response(db, rfq)
 
 
@@ -408,6 +447,18 @@ async def submit_bid(
     db.add(bid)
     await db.flush()
     logger.info("rfq_bid_submitted", rfq_id=rfq_id, vendor_id=vendor_id)
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="RFQ_BID_SUBMITTED",
+        entity_type="RFQ",
+        entity_id=rfq_id,
+        after_state={"bid_id": str(bid.id), "vendor_id": vendor_id, "total_cents": body.total_cents},
+        actor_email=current_user.get("email"),
+    )
+
     return _bid_to_response(bid)
 
 
@@ -573,6 +624,23 @@ async def award_rfq(
         logger.error("award_notification_failed", rfq_id=rfq_id, po_id=str(po.id), error=str(exc))
 
     logger.info("rfq_awarded", rfq_id=rfq_id, bid_id=str(bid.id), po_id=str(po.id), vendor_id=str(vendor.id))
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="RFQ_AWARDED",
+        entity_type="RFQ",
+        entity_id=rfq_id,
+        before_state={"status": "OPEN"},
+        after_state={
+            "status": "AWARDED",
+            "awarded_vendor_id": str(vendor.id),
+            "awarded_po_id": str(po.id),
+            "bid_id": str(bid.id),
+        },
+        actor_email=current_user.get("email"),
+    )
 
     return PurchaseOrderResponse(
         id=str(po.id),

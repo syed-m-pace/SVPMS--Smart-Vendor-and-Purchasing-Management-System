@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,8 +13,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 'syedmuheeb2001@gmail.com');
-  final _passwordCtrl = TextEditingController(text: 'SvpmsTest123!');
+  final _emailCtrl = TextEditingController(text: kDebugMode ? 'sales@alphasupplies.com' : '');
+  final _passwordCtrl = TextEditingController(text: kDebugMode ? 'SvpmsTest123!' : '');
   bool _obscure = true;
 
   @override
@@ -184,46 +185,47 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Demo credentials
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
+                    // Demo credentials — only shown in debug builds
+                    if (kDebugMode)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Demo Credentials',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'sales@alphasupplies.com',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              'SvpmsTest123!',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppColors.accentLight,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Demo Credentials',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'vendor@alphasupplies.com',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            'SvpmsTest123!',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: AppColors.accentLight,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),

@@ -420,7 +420,10 @@ async def acknowledge_purchase_order(
         try:
             po.expected_delivery_date = datetime.fromisoformat(body.expected_delivery_date)
         except ValueError:
-            pass # Invalid format, ignore or handle elsewhere
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid expected_delivery_date format (use ISO 8601, e.g. YYYY-MM-DD)",
+            )
 
     po.status = "ACKNOWLEDGED"
     await db.flush()

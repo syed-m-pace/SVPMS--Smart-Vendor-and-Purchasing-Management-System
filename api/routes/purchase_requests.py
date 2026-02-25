@@ -225,6 +225,24 @@ async def create_purchase_request(
     _auth: None = Depends(require_roles("procurement", "procurement_lead", "admin", "manager", "finance")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
+    # Validate line items
+    if not body.line_items:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one line item is required",
+        )
+    for li in body.line_items:
+        if li.quantity < 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Line item quantity must be >= 1, got {li.quantity}",
+            )
+        if li.unit_price_cents < 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Line item unit_price_cents must be >= 1, got {li.unit_price_cents}",
+            )
+
     total_cents = sum(li.quantity * li.unit_price_cents for li in body.line_items)
 
     pr_number = await _generate_pr_number(db)

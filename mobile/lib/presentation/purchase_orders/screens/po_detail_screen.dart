@@ -47,7 +47,13 @@ class PODetailScreen extends StatelessWidget {
 
             if (po == null) return const SizedBox();
 
-            return SingleChildScrollView(
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<POBloc>().add(LoadPODetail(poId));
+                await Future.delayed(const Duration(milliseconds: 500));
+              },
+              child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,6 +154,7 @@ class PODetailScreen extends StatelessWidget {
                     ),
                 ],
               ),
+            ),
             );
           },
         ),

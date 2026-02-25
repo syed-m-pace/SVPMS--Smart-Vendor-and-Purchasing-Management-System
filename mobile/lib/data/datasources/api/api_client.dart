@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:dio/dio.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../services/storage_service.dart';
@@ -5,6 +7,7 @@ import '../../../services/storage_service.dart';
 class ApiClient {
   late final Dio dio;
   final StorageService _storage;
+  VoidCallback? _onAuthFailure;
 
   ApiClient({required StorageService storage}) : _storage = storage {
     dio = Dio(
@@ -41,11 +44,45 @@ class ApiClient {
                 return handler.next(error);
               }
             }
+            // Refresh failed — trigger auth failure callback to redirect to login
+            _onAuthFailure?.call();
           }
-          return handler.next(error);
+          // Wrap with friendly message
+          return handler.next(error.copyWith(message: _friendlyMessage(error)));
         },
       ),
     );
+  }
+
+  /// Register a callback invoked when token refresh fails (session expired).
+  /// Typically wired to `authBloc.add(LogoutRequested())`.
+  void setOnAuthFailure(VoidCallback callback) {
+    _onAuthFailure = callback;
+  }
+
+  /// Map DioException to user-friendly error messages
+  static String _friendlyMessage(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return 'Connection timed out. Please try again.';
+      case DioExceptionType.connectionError:
+        return 'No internet connection. Check your network.';
+      case DioExceptionType.badResponse:
+        final status = e.response?.statusCode ?? 0;
+        final detail = e.response?.data;
+        if (detail is Map && detail['detail'] is String) {
+          return detail['detail'] as String;
+        }
+        if (status == 429) return 'Too many requests. Please slow down.';
+        if (status >= 500) return 'Server error. Please try again later.';
+        if (status == 403) return 'You don\'t have permission for this action.';
+        if (status == 404) return 'The requested item was not found.';
+        return e.message ?? 'Request failed';
+      default:
+        return e.message ?? 'Something went wrong. Please try again.';
+    }
   }
 
   Future<bool> _tryRefresh() async {

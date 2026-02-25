@@ -105,9 +105,17 @@ class _RFQListScreenState extends State<RFQListScreen> {
                     itemBuilder: (context, i) {
                       final rfq = state.rfqs[i];
                       final isAwarded = rfq.status == 'AWARDED';
-                      final myVendorId = rfq.bids.isNotEmpty ? rfq.bids.first.vendorId : null;
-                      final hasWonPo = isAwarded && myVendorId != null && rfq.awardedVendorId == myVendorId;
-                      final hasLost = isAwarded && myVendorId != null && rfq.awardedVendorId != myVendorId;
+                      final myVendorId = rfq.bids.isNotEmpty
+                          ? rfq.bids.first.vendorId
+                          : null;
+                      final hasWonPo =
+                          isAwarded &&
+                          myVendorId != null &&
+                          rfq.awardedVendorId == myVendorId;
+                      final hasLost =
+                          isAwarded &&
+                          myVendorId != null &&
+                          rfq.awardedVendorId != myVendorId;
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -169,7 +177,7 @@ class _RFQListScreenState extends State<RFQListScreen> {
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.error.withValues(
+                                        color: AppColors.destructive.withValues(
                                           alpha: 0.15,
                                         ),
                                         borderRadius: BorderRadius.circular(4),
@@ -177,7 +185,7 @@ class _RFQListScreenState extends State<RFQListScreen> {
                                       child: const Text(
                                         'Awarded to another vendor',
                                         style: TextStyle(
-                                          color: AppColors.error,
+                                          color: AppColors.destructive,
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                         ),

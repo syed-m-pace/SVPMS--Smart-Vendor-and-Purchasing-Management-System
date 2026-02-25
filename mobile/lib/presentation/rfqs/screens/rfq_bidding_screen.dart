@@ -201,9 +201,9 @@ class _RFQBiddingScreenState extends State<RFQBiddingScreen> {
                             ),
                             validator: (v) {
                               if (v == null || v.isEmpty) return 'Required';
-                              if (double.tryParse(v) == null) {
-                                return 'Invalid number';
-                              }
+                              final parsed = double.tryParse(v);
+                              if (parsed == null) return 'Invalid number';
+                              if (parsed <= 0) return 'Amount must be greater than 0';
                               return null;
                             },
                           ),
@@ -219,8 +219,14 @@ class _RFQBiddingScreenState extends State<RFQBiddingScreen> {
                               prefixIcon: Icon(Icons.schedule),
                               helperText: 'Days to deliver after PO',
                             ),
-                            validator: (v) =>
-                                v?.isEmpty ?? true ? 'Required' : null,
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Required';
+                              final parsed = int.tryParse(v);
+                              if (parsed == null || parsed < 1) {
+                                return 'Lead time must be at least 1 day';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
                           TextFormField(

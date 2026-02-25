@@ -52,6 +52,9 @@ dependencies:
   # URL / Document opening
   url_launcher: ^6.3.0
 
+  # App Info
+  package_info_plus: ^8.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

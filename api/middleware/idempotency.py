@@ -41,8 +41,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if not idempotency_key:
             return await call_next(request)
 
-        # Scope key to tenant if available (prevent cross-tenant replay)
-        tenant_id = request.headers.get("X-Tenant-ID", "global")
+        # Scope key to tenant from JWT (prevent cross-tenant replay)
+        tenant_id = getattr(request.state, "tenant_id", None) or "global"
         cache_key = f"idempotency:{tenant_id}:{idempotency_key}"
         lock_key = f"idempotency_lock:{tenant_id}:{idempotency_key}"
 

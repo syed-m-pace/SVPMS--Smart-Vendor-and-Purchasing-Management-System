@@ -159,7 +159,9 @@ class _InvoiceUploadScreenState extends State<InvoiceUploadScreen> {
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Required';
-                    if (double.tryParse(v) == null) return 'Invalid amount';
+                    final parsed = double.tryParse(v);
+                    if (parsed == null) return 'Invalid amount';
+                    if (parsed <= 0) return 'Amount must be greater than 0';
                     return null;
                   },
                 ),

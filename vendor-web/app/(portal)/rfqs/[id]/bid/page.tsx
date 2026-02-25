@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Send } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,10 +29,13 @@ export default function BidFormPage() {
         register,
         handleSubmit,
         setValue,
+        control,
         formState: { errors },
     } = useForm<BidFormData>({
         resolver: zodResolver(bidSchema),
     });
+
+    const watchedAmount = useWatch({ control, name: "total_amount" });
 
     useEffect(() => {
         rfqService.get(id).then((data) => {
@@ -40,7 +43,7 @@ export default function BidFormPage() {
             // Pre-fill if existing bid
             const myBid = data.bids?.find((b) => vendor && b.vendor_id === vendor.id);
             if (myBid) {
-                setValue("total_cents", myBid.total_cents);
+                setValue("total_amount", myBid.total_cents / 100);
                 setValue("delivery_days", myBid.delivery_days || 0);
                 setValue("notes", myBid.notes || "");
             }
@@ -50,8 +53,9 @@ export default function BidFormPage() {
     const onSubmit = async (formData: BidFormData) => {
         setSubmitting(true);
         try {
+            const totalCents = Math.round(formData.total_amount * 100);
             await rfqService.submitBid(id, {
-                total_cents: formData.total_cents,
+                total_cents: totalCents,
                 delivery_days: formData.delivery_days,
                 notes: formData.notes,
             });
@@ -114,15 +118,26 @@ export default function BidFormPage() {
             <Card className="p-5">
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="total_cents">Total Bid Amount (in paise/cents)</Label>
-                        <Input
-                            id="total_cents"
-                            type="number"
-                            placeholder="e.g., 500000 for ₹5,000"
-                            {...register("total_cents", { valueAsNumber: true })}
-                        />
-                        {errors.total_cents && (
-                            <p className="text-xs text-destructive">{errors.total_cents.message}</p>
+                        <Label htmlFor="total_amount">Total Bid Amount (INR)</Label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">&#8377;</span>
+                            <Input
+                                id="total_amount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="5,000.00"
+                                className="pl-7"
+                                {...register("total_amount", { valueAsNumber: true })}
+                            />
+                        </div>
+                        {watchedAmount > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                = {formatCurrency(Math.round(watchedAmount * 100))}
+                            </p>
+                        )}
+                        {errors.total_amount && (
+                            <p className="text-xs text-destructive">{errors.total_amount.message}</p>
                         )}
                     </div>
 

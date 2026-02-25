@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trophy, ExternalLink } from "lucide-react";
@@ -45,6 +45,19 @@ export default function RFQDetailPage() {
 
     const myBid = rfq.bids?.find((b) => vendor && b.vendor_id === vendor.id);
     const isAwarded = rfq.status === "AWARDED" && rfq.awarded_vendor_id === vendor?.id;
+
+    const deadlineInfo = useMemo(() => {
+        if (!rfq.deadline) return null;
+        const deadline = new Date(rfq.deadline);
+        const now = new Date();
+        const diffMs = deadline.getTime() - now.getTime();
+        if (diffMs <= 0) return { label: "Deadline passed", color: "text-destructive" };
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const label = days > 0 ? `${days}d ${hours}h remaining` : `${hours}h remaining`;
+        const color = days >= 7 ? "text-green-600" : days >= 3 ? "text-yellow-600" : "text-destructive";
+        return { label, color };
+    }, [rfq.deadline]);
 
     return (
         <div className="space-y-6">
@@ -95,7 +108,16 @@ export default function RFQDetailPage() {
                         <InfoRow label="RFQ Number" value={rfq.rfq_number} />
                         <InfoRow label="Status" value={<StatusBadge status={rfq.status} />} />
                         <InfoRow label="Budget" value={rfq.budget_cents ? formatCurrency(rfq.budget_cents) : "—"} />
-                        <InfoRow label="Deadline" value={formatDate(rfq.deadline)} />
+                        <InfoRow label="Deadline" value={
+                            <span>
+                                {formatDate(rfq.deadline)}
+                                {deadlineInfo && rfq.status === "OPEN" && (
+                                    <span className={`ml-2 text-xs font-medium ${deadlineInfo.color}`}>
+                                        ({deadlineInfo.label})
+                                    </span>
+                                )}
+                            </span>
+                        } />
                         <InfoRow label="Created" value={formatDate(rfq.created_at)} />
                     </div>
                     {rfq.description && (

@@ -61,6 +61,10 @@ class ContractUpdate(BaseModel):
     sla_terms: Optional[str] = None
 
 
+class ContractTerminateRequest(BaseModel):
+    reason: str = Field(..., min_length=10, max_length=1000)
+
+
 class ContractResponse(BaseModel):
     id: str
     contract_number: str
@@ -324,7 +328,7 @@ async def activate_contract(
 @router.post("/{contract_id}/terminate", response_model=ContractResponse)
 async def terminate_contract(
     contract_id: str,
-    body: dict,
+    body: ContractTerminateRequest,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("admin", "finance_head", "cfo")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -345,9 +349,7 @@ async def terminate_contract(
             status_code=400, detail=f"Cannot terminate contract in '{contract.status}' status"
         )
 
-    reason = body.get("reason", "")
-    if len(reason) < 10:
-        raise HTTPException(status_code=400, detail="Termination reason must be at least 10 characters")
+    reason = body.reason
 
     before = {"status": contract.status}
     contract.status = "TERMINATED"

@@ -211,6 +211,15 @@ async def create_invoice(
                 detail="Invalid due_date format (use YYYY-MM-DD)",
             )
 
+    # Validate line items total matches declared total_cents
+    if body.line_items:
+        computed_total = sum(li.quantity * li.unit_price_cents for li in body.line_items)
+        if computed_total != body.total_cents:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Line items total ({computed_total}) does not match total_cents ({body.total_cents})",
+            )
+
     inv = Invoice(
         tenant_id=current_user["tenant_id"],
         invoice_number=body.invoice_number,
@@ -268,7 +277,14 @@ async def dispute_invoice(
     _auth: None = Depends(require_roles("vendor")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    # Verify the vendor owns this invoice
+    vendor = await resolve_vendor_for_user(db, current_user)
+    if not vendor:
+        raise HTTPException(status_code=403, detail="No vendor record linked to your account")
+
+    result = await db.execute(
+        select(Invoice).where(Invoice.id == invoice_id, Invoice.vendor_id == vendor.id)
+    )
     inv = result.scalar_one_or_none()
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")

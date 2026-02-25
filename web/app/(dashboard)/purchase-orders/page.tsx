@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -162,6 +164,15 @@ export default function PurchaseOrdersPage() {
         }
     }
 
+    // PO Search
+    const [poSearch, setPoSearch] = useState("");
+    const filteredPos = poSearch
+        ? pos.filter((po) =>
+            po.po_number?.toLowerCase().includes(poSearch.toLowerCase()) ||
+            po.vendor_name?.toLowerCase().includes(poSearch.toLowerCase())
+        )
+        : pos;
+
     const poColumns = [
         { header: "PO Number", cell: (po: PurchaseOrder) => <span className="font-mono font-medium">{po.po_number}</span> },
         { header: "Vendor", cell: (po: PurchaseOrder) => <span>{po.vendor_name || "—"}</span> },
@@ -192,11 +203,19 @@ export default function PurchaseOrdersPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Purchase Orders & RFQs</h1>
                     <p className="text-muted-foreground mt-1">Manage PO lifecycle and Quotations</p>
                 </div>
-                {activeTab === "rfqs" && (
-                    <Button onClick={() => router.push("/purchase-orders/rfqs/new")}>
-                        Issue New RFQ
-                    </Button>
-                )}
+                <div className="flex items-center gap-3">
+                    {activeTab === "all" && (
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search POs..." value={poSearch} onChange={(e) => setPoSearch(e.target.value)} className="pl-9 w-[200px]" />
+                        </div>
+                    )}
+                    {activeTab === "rfqs" && (
+                        <Button onClick={() => router.push("/purchase-orders/rfqs/new")}>
+                            Issue New RFQ
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -256,7 +275,7 @@ export default function PurchaseOrdersPage() {
 
                     <DataTable
                         columns={poColumns}
-                        data={pos}
+                        data={filteredPos}
                         loading={loading}
                         page={page}
                         totalPages={totalPages}

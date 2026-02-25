@@ -13,6 +13,7 @@ class AppNotification {
   final String type;
   final String? deepLinkPath;
   final DateTime receivedAt;
+  final bool isRead;
 
   const AppNotification({
     required this.id,
@@ -21,7 +22,18 @@ class AppNotification {
     required this.type,
     this.deepLinkPath,
     required this.receivedAt,
+    this.isRead = false,
   });
+
+  AppNotification copyWith({bool? isRead}) => AppNotification(
+    id: id,
+    title: title,
+    body: body,
+    type: type,
+    deepLinkPath: deepLinkPath,
+    receivedAt: receivedAt,
+    isRead: isRead ?? this.isRead,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -30,6 +42,7 @@ class AppNotification {
     'type': type,
     'deepLinkPath': deepLinkPath,
     'receivedAt': receivedAt.toIso8601String(),
+    'isRead': isRead,
   };
 
   factory AppNotification.fromJson(Map<String, dynamic> json) =>
@@ -41,6 +54,7 @@ class AppNotification {
         deepLinkPath: json['deepLinkPath'],
         receivedAt:
             DateTime.tryParse(json['receivedAt'] ?? '') ?? DateTime.now(),
+        isRead: json['isRead'] == true,
       );
 }
 
@@ -117,6 +131,10 @@ class NotificationService {
     }
 
     _isInitialized = true;
+
+    // Auto-cleanup old notifications (> 30 days)
+    await cleanupOldNotifications();
+
     if (kDebugMode) {
       print('NotificationService initialized');
       final token = await _fcm.getToken();
@@ -178,22 +196,66 @@ class NotificationService {
     }
   }
 
-  final int _unreadCount = 0;
-  int get unreadCount => _unreadCount;
+  /// Mark a notification as read by its ID.
+  Future<void> markAsRead(String notificationId) async {
+    try {
+      final box = await Hive.openBox(_hiveBoxName);
+      final raw = box.get(_hiveKey, defaultValue: '[]') as String;
+      final List<dynamic> list = jsonDecode(raw);
+      final updated = list.map((e) {
+        final map = Map<String, dynamic>.from(e);
+        if (map['id'] == notificationId) {
+          map['isRead'] = true;
+        }
+        return map;
+      }).toList();
+      await box.put(_hiveKey, jsonEncode(updated));
+    } catch (e) {
+      if (kDebugMode) print('NotificationService.markAsRead error: $e');
+    }
+  }
+
+  /// Remove notifications older than 30 days.
+  Future<void> cleanupOldNotifications() async {
+    try {
+      final box = await Hive.openBox(_hiveBoxName);
+      final raw = box.get(_hiveKey, defaultValue: '[]') as String;
+      final List<dynamic> list = jsonDecode(raw);
+      final cutoff = DateTime.now().subtract(const Duration(days: 30));
+      final filtered = list.where((e) {
+        final receivedAt = DateTime.tryParse(e['receivedAt'] ?? '');
+        return receivedAt != null && receivedAt.isAfter(cutoff);
+      }).toList();
+      await box.put(_hiveKey, jsonEncode(filtered));
+    } catch (e) {
+      if (kDebugMode) print('NotificationService.cleanup error: $e');
+    }
+  }
+
+  /// Get count of unread notifications.
+  Future<int> getUnreadCount() async {
+    final notifications = await getStoredNotifications();
+    return notifications.where((n) => !n.isRead).length;
+  }
 
   // ─── Deep Link Routing ────────────────────────────────────────────────────
 
   String? _buildDeepLink(String type, String? id) {
     switch (type) {
       case 'NEW_PO':
+      case 'PO_AWARDED':
         return id != null ? '/purchase-orders/$id' : '/purchase-orders';
       case 'NEW_RFQ':
         return id != null ? '/rfqs/$id' : '/rfqs';
       case 'INVOICE_MATCHED':
       case 'INVOICE_UPDATE':
+      case 'INVOICE_EXCEPTION':
+      case 'INVOICE_DISPUTE':
+      case 'INVOICE_PAID':
+      case 'PAYMENT_APPROVED':
         return id != null ? '/invoices/$id' : '/invoices';
       default:
-        return null;
+        return '/dashboard';
     }
   }
 
@@ -201,12 +263,22 @@ class NotificationService {
     switch (type) {
       case 'NEW_PO':
         return 'New Purchase Order';
+      case 'PO_AWARDED':
+        return 'PO Awarded';
       case 'NEW_RFQ':
         return 'New RFQ Invitation';
       case 'INVOICE_MATCHED':
         return 'Invoice Matched';
       case 'INVOICE_UPDATE':
         return 'Invoice Updated';
+      case 'INVOICE_EXCEPTION':
+        return 'Invoice Exception';
+      case 'INVOICE_DISPUTE':
+        return 'Invoice Dispute';
+      case 'INVOICE_PAID':
+        return 'Invoice Paid';
+      case 'PAYMENT_APPROVED':
+        return 'Payment Approved';
       default:
         return 'SVPMS Notification';
     }

@@ -43,14 +43,15 @@ SKIP_PATHS = {"/health"}
 SKIP_PREFIXES = ("/internal/",)
 
 
-def _get_role_tier(request: Request) -> str:
+def _extract_jwt_info(request: Request) -> tuple[str, str | None]:
     """
-    Extract user role from JWT payload (middle section of Bearer token).
-    Fails open — returns 'vendor' tier on any decode error to stay conservative.
+    Extract user role tier and user_id from JWT payload.
+    Returns (tier, user_id) — user_id may be None for unauthenticated requests.
+    Fails open — returns ('vendor', None) on any decode error.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        return "vendor"
+        return "vendor", None
     try:
         token = auth_header.split(" ", 1)[1]
         payload_b64 = token.split(".")[1]
@@ -58,13 +59,14 @@ def _get_role_tier(request: Request) -> str:
         payload_b64 += "=" * (4 - len(payload_b64) % 4)
         payload = json.loads(base64.urlsafe_b64decode(payload_b64))
         role = payload.get("role", "")
+        user_id = payload.get("sub") or payload.get("user_id")
         if role in _PRIVILEGED_ROLES:
-            return "privileged"
+            return "privileged", user_id
         if role in _INTERNAL_ROLES:
-            return "internal"
-        return "vendor"
+            return "internal", user_id
+        return "vendor", user_id
     except Exception:
-        return "vendor"
+        return "vendor", None
 
 
 def _get_path_category(path: str) -> str:
@@ -92,13 +94,16 @@ async def rate_limit_middleware(request: Request, call_next):
     else:
         client_ip = request.client.host if request.client else "unknown"
 
-    tier = _get_role_tier(request)
+    tier, user_id = _extract_jwt_info(request)
     category = _get_path_category(path)
     config = _TIER_LIMITS[tier][category]
     limit = config["limit"]
     window = config["window"]
 
-    key = f"rl:{tier}:{client_ip}:{path}"
+    # Use user_id for authenticated requests (prevents shared-IP blocking),
+    # fall back to IP for unauthenticated endpoints
+    identity = user_id or client_ip
+    key = f"rl:{tier}:{identity}:{path}"
 
     try:
         results = await cache.pipeline([

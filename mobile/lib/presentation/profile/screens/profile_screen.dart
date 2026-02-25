@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/datasources/api/api_client.dart';
 import 'package:file_picker/file_picker.dart';
@@ -16,11 +17,22 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late Future<Vendor> _vendorFuture;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _vendorFuture = _fetchVendor();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = 'v${info.version}+${info.buildNumber}';
+      });
+    }
   }
 
   Future<Vendor> _fetchVendor() async {
@@ -376,7 +388,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _tile(
                               Icons.info_outline,
                               'About SVPMS',
-                              subtitle: 'v1.0.0',
+                              subtitle: _appVersion.isNotEmpty
+                                  ? _appVersion
+                                  : 'v1.0.0',
                             ),
                           ],
                         ),
@@ -399,7 +413,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _logoutButton(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: () {
-        context.read<AuthBloc>().add(LogoutRequested());
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Sign Out'),
+            content: const Text('Are you sure you want to sign out?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.read<AuthBloc>().add(LogoutRequested());
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.destructive,
+                ),
+                child: const Text('Sign Out'),
+              ),
+            ],
+          ),
+        );
       },
       icon: const Icon(Icons.logout, color: AppColors.destructive),
       label: const Text(
