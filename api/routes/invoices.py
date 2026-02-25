@@ -266,13 +266,11 @@ async def create_invoice(
         )
         logger.info("ocr_queued", invoice_id=str(inv.id))
 
-    return _to_response(inv, line_items)
-
-
 @router.post("/{invoice_id}/dispute", response_model=InvoiceResponse)
 async def dispute_invoice(
     invoice_id: str,
     body: InvoiceDisputeRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("vendor", "manager", "admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -288,10 +286,10 @@ async def dispute_invoice(
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    if inv.status != "EXCEPTION":
+    if inv.status not in ("UPLOADED", "MATCHED", "EXCEPTION"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only dispute invoices in EXCEPTION status",
+            detail="Can only dispute invoices in UPLOADED, MATCHED, or EXCEPTION status",
         )
 
     before = {"status": inv.status}
@@ -313,6 +311,19 @@ async def dispute_invoice(
     await db.flush()
     line_items = await _get_line_items(db, inv.id)
     logger.info("invoice_disputed", invoice_id=str(inv.id), reason=body.reason)
+
+    vendor_email_result = await db.execute(
+        select(Vendor.email).where(Vendor.id == inv.vendor_id)
+    )
+    v_email = vendor_email_result.scalar_one_or_none()
+    if v_email:
+        background_tasks.add_task(
+            send_notification,
+            "invoice_disputed",
+            [v_email],
+            {"invoice_number": inv.invoice_number, "reason": body.reason},
+        )
+
     return _to_response(inv, line_items)
 
 

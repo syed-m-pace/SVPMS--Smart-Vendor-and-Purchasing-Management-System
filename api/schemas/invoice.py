@@ -61,8 +61,8 @@ class InvoicePaymentActionRequest(BaseModel):
 
 
 class InvoiceDisputeRequest(BaseModel):
-    reason: str = Field(..., min_length=10)
+    reason: str = Field(..., min_length=5)
 
 
 class InvoiceOverrideRequest(BaseModel):
-    reason: str = Field(..., min_length=10)
+    reason: str = Field(..., min_length=5)
