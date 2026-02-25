@@ -24,6 +24,19 @@ export default function RFQDetailPage() {
         rfqService.get(id).then(setRfq).catch(() => toast.error("Failed to load RFQ")).finally(() => setLoading(false));
     }, [id]);
 
+    const deadlineInfo = useMemo(() => {
+        if (!rfq?.deadline) return null;
+        const deadline = new Date(rfq.deadline);
+        const now = new Date();
+        const diffMs = deadline.getTime() - now.getTime();
+        if (diffMs <= 0) return { label: "Deadline passed", color: "text-destructive" };
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const label = days > 0 ? `${days}d ${hours}h remaining` : `${hours}h remaining`;
+        const color = days >= 7 ? "text-green-600" : days >= 3 ? "text-yellow-600" : "text-destructive";
+        return { label, color };
+    }, [rfq?.deadline]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
@@ -45,19 +58,6 @@ export default function RFQDetailPage() {
 
     const myBid = rfq.bids?.find((b) => vendor && b.vendor_id === vendor.id);
     const isAwarded = rfq.status === "AWARDED" && rfq.awarded_vendor_id === vendor?.id;
-
-    const deadlineInfo = useMemo(() => {
-        if (!rfq.deadline) return null;
-        const deadline = new Date(rfq.deadline);
-        const now = new Date();
-        const diffMs = deadline.getTime() - now.getTime();
-        if (diffMs <= 0) return { label: "Deadline passed", color: "text-destructive" };
-        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const label = days > 0 ? `${days}d ${hours}h remaining` : `${hours}h remaining`;
-        const color = days >= 7 ? "text-green-600" : days >= 3 ? "text-yellow-600" : "text-destructive";
-        return { label, color };
-    }, [rfq.deadline]);
 
     return (
         <div className="space-y-6">

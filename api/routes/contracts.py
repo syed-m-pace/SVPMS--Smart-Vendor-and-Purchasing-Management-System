@@ -270,6 +270,7 @@ async def update_contract(
     if contract.status == "TERMINATED":
         raise HTTPException(status_code=400, detail="Cannot modify a terminated contract")
 
+    before = {"status": contract.status}
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(contract, field, value)
 
@@ -278,6 +279,19 @@ async def update_contract(
 
     await db.flush()
     await db.refresh(contract)
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="CONTRACT_UPDATED",
+        entity_type="CONTRACT",
+        entity_id=contract_id,
+        before_state=before,
+        after_state={"status": contract.status, "updated_fields": list(body.model_dump(exclude_none=True).keys())},
+        actor_email=current_user.get("email"),
+    )
+
     return _to_response(contract, vendor_name)
 
 
@@ -390,5 +404,18 @@ async def delete_contract(
         raise HTTPException(
             status_code=400, detail="Only DRAFT contracts can be deleted"
         )
+    before = {"status": contract.status, "deleted_at": None}
     contract.deleted_at = datetime.utcnow()
     await db.flush()
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="CONTRACT_DELETED",
+        entity_type="CONTRACT",
+        entity_id=contract_id,
+        before_state=before,
+        after_state={"status": contract.status, "deleted_at": contract.deleted_at.isoformat()},
+        actor_email=current_user.get("email"),
+    )

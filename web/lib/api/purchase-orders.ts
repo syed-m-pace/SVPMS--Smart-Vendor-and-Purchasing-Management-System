@@ -25,4 +25,10 @@ export const poService = {
         const { data } = await api.post<PurchaseOrder>("/purchase-orders", body);
         return data;
     },
+    cancel: async (id: string, reason: string) => {
+        const { data } = await api.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`, {
+            reason,
+        });
+        return data;
+    },
 };

@@ -297,7 +297,12 @@ async def create_purchase_order(
     delivery_date = None
     if body.expected_delivery_date:
         try:
-            delivery_date = date_type.fromisoformat(body.expected_delivery_date)
+            date_str = body.expected_delivery_date
+            if "T" in date_str:
+                date_str = date_str.split("T")[0]
+            if " " in date_str:
+                date_str = date_str.split(" ")[0]
+            delivery_date = date_type.fromisoformat(date_str)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -418,7 +423,12 @@ async def acknowledge_purchase_order(
 
     if body.expected_delivery_date:
         try:
-            po.expected_delivery_date = datetime.fromisoformat(body.expected_delivery_date)
+            date_str = body.expected_delivery_date
+            if "T" in date_str:
+                date_str = date_str.split("T")[0]
+            if " " in date_str:
+                date_str = date_str.split(" ")[0]
+            po.expected_delivery_date = datetime.fromisoformat(date_str)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

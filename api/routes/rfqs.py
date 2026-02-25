@@ -338,8 +338,23 @@ async def close_rfq(
             detail="Can only close RFQs in OPEN status",
         )
 
+    before = {"status": rfq.status}
     rfq.status = "CLOSED"
     await db.flush()
+    logger.info("rfq_closed", rfq_id=rfq_id, by=current_user["user_id"])
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="RFQ_CLOSED",
+        entity_type="RFQ",
+        entity_id=rfq_id,
+        before_state=before,
+        after_state={"status": "CLOSED"},
+        actor_email=current_user.get("email"),
+    )
+
     return await _build_response(db, rfq)
 
 

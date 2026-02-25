@@ -9,7 +9,17 @@ import type { RFQ, RFQBid, Vendor } from "@/types/models";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Users, CheckCircle, Package, XCircle, ExternalLink } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Clock, Users, CheckCircle, Package, XCircle, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
 
@@ -23,6 +33,7 @@ export default function RfqDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [awarding, setAwarding] = useState<string | null>(null);
     const [closing, setClosing] = useState(false);
+    const [closeDialogOpen, setCloseDialogOpen] = useState(false);
     const [awardedPoId, setAwardedPoId] = useState<string | null>(null);
 
     const getErrorMessage = (error: unknown, fallback: string) => {
@@ -70,6 +81,7 @@ export default function RfqDetailsPage() {
         }
     };
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (rfqId) {
             fetchDetails();
@@ -97,6 +109,7 @@ export default function RfqDetailsPage() {
             const updated = await rfqService.close(rfq.id);
             setRfq(updated);
             toast.success("RFQ closed — bidding is no longer accepted");
+            setCloseDialogOpen(false);
         } catch (error) {
             toast.error(getErrorMessage(error, "Failed to close RFQ"));
         } finally {
@@ -132,12 +145,12 @@ export default function RfqDetailsPage() {
                 {canClose && (
                     <Button
                         variant="outline"
-                        onClick={handleClose}
+                        onClick={() => setCloseDialogOpen(true)}
                         disabled={closing}
                         className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
                     >
                         <XCircle className="h-4 w-4" />
-                        {closing ? "Closing..." : "Close RFQ"}
+                        Close RFQ
                     </Button>
                 )}
                 {isAwarded && awardedPoId && (
@@ -287,6 +300,30 @@ export default function RfqDetailsPage() {
                 </CardContent>
             </Card>
 
+            <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Close RFQ &quot;{rfq.rfq_number}&quot;?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to forcibly close this Request for Quotation? Vendors will no longer be able to submit bids. This action is irreversible.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={closing}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleClose();
+                            }}
+                            disabled={closing}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {closing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Close RFQ
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

@@ -42,7 +42,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Scope key to tenant from JWT (prevent cross-tenant replay)
-        tenant_id = getattr(request.state, "tenant_id", None) or "global"
+        tenant_id = "global"
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                import base64
+                token = auth_header.split(" ", 1)[1]
+                payload_b64 = token.split(".")[1]
+                payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+                if "tenant_id" in payload:
+                    tenant_id = payload["tenant_id"]
+            except Exception:
+                pass
+
         cache_key = f"idempotency:{tenant_id}:{idempotency_key}"
         lock_key = f"idempotency_lock:{tenant_id}:{idempotency_key}"
 
