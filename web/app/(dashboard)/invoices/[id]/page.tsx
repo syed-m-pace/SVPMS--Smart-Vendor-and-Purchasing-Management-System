@@ -47,7 +47,7 @@ export default function InvoiceDetailPage() {
         if (!inv) return;
         setApprovingPayment(true);
         try {
-            const updated = await invoiceService.approvePayment(inv.id);
+            const updated = await invoiceService.approvePayment(inv.id, "Manual override approval for stuck OCR");
             setInv(updated);
             toast.success("Invoice approved for payment");
         } catch {
@@ -55,6 +55,20 @@ export default function InvoiceDetailPage() {
         } finally {
             setApprovingPayment(false);
             setApprovePaymentOpen(false);
+        }
+    }
+
+    async function handleRaiseException() {
+        if (!inv) return;
+        const reason = window.prompt("Exception / Dispute Reason (min 5 chars):");
+        if (!reason || reason.length < 5) return;
+
+        try {
+            const updated = await invoiceService.dispute(inv.id, reason);
+            setInv(updated);
+            toast.success("Exception raised successfully");
+        } catch {
+            toast.error("Failed to raise exception");
         }
     }
 
@@ -145,7 +159,21 @@ export default function InvoiceDetailPage() {
                 <CardHeader><CardTitle className="text-lg">Next Steps</CardTitle></CardHeader>
                 <CardContent className="text-sm space-y-3">
                     {inv.status === "UPLOADED" && (
-                        <p className="text-muted-foreground">OCR processing in progress. The invoice will be automatically matched against the purchase order once extraction completes.</p>
+                        <div className="space-y-4">
+                            <p className="text-muted-foreground">OCR processing in progress. The invoice will be automatically matched against the purchase order once extraction completes.</p>
+                            <div className="bg-muted/50 p-4 rounded-lg border space-y-3">
+                                <p className="text-sm font-medium">Manual Override Controls</p>
+                                <p className="text-xs text-muted-foreground">If OCR is failing or stuck, you can manually push this invoice forward or raise an exception back to the vendor.</p>
+                                <div className="flex gap-3 flex-wrap pt-2">
+                                    <Button size="sm" onClick={() => setApprovePaymentOpen(true)}>
+                                        Manually Approve Payment
+                                    </Button>
+                                    <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={handleRaiseException}>
+                                        Raise Exception
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                     {inv.status === "MATCHED" && (
                         <div className="space-y-2">
