@@ -16,6 +16,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { invoiceService } from "@/lib/api/invoices";
 import { api } from "@/lib/api/client";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -38,6 +40,9 @@ export default function InvoiceDetailPage() {
     const [approvingPayment, setApprovingPayment] = useState(false);
     const [markPaidOpen, setMarkPaidOpen] = useState(false);
     const [markingPaid, setMarkingPaid] = useState(false);
+    const [raiseExceptionOpen, setRaiseExceptionOpen] = useState(false);
+    const [raisingException, setRaisingException] = useState(false);
+    const [exceptionReason, setExceptionReason] = useState("");
 
     useEffect(() => {
         invoiceService.get(params.id as string).then(setInv).catch(() => toast.error("Failed")).finally(() => setLoading(false));
@@ -59,16 +64,18 @@ export default function InvoiceDetailPage() {
     }
 
     async function handleRaiseException() {
-        if (!inv) return;
-        const reason = window.prompt("Exception / Dispute Reason (min 5 chars):");
-        if (!reason || reason.length < 5) return;
-
+        if (!inv || exceptionReason.length < 5) return;
+        setRaisingException(true);
         try {
-            const updated = await invoiceService.dispute(inv.id, reason);
+            const updated = await invoiceService.dispute(inv.id, exceptionReason);
             setInv(updated);
             toast.success("Exception raised successfully");
         } catch {
             toast.error("Failed to raise exception");
+        } finally {
+            setRaisingException(false);
+            setRaiseExceptionOpen(false);
+            setExceptionReason("");
         }
     }
 
@@ -168,7 +175,7 @@ export default function InvoiceDetailPage() {
                                     <Button size="sm" onClick={() => setApprovePaymentOpen(true)}>
                                         Manually Approve Payment
                                     </Button>
-                                    <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={handleRaiseException}>
+                                    <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setRaiseExceptionOpen(true)}>
                                         Raise Exception
                                     </Button>
                                 </div>
@@ -182,30 +189,36 @@ export default function InvoiceDetailPage() {
                         </div>
                     )}
                     {inv.status === "APPROVED" && (
-                        <div className="space-y-2">
-                            <p className="text-blue-600 font-medium">Invoice approved for payment. Ready to mark as paid.</p>
-                            <Button size="sm" variant="outline" onClick={() => setMarkPaidOpen(true)}>Mark as Paid</Button>
+                        <div className="space-y-4">
+                            <p className="text-green-600 font-bold text-lg">Payment Scheduled Successfully.</p>
+                            <div className="pt-2 border-t">
+                                <p className="text-sm text-muted-foreground mb-3">The vendor has been notified and the payment is pending final settlement.</p>
+                                <Button size="sm" variant="outline" onClick={() => setMarkPaidOpen(true)}>Mark as Paid</Button>
+                            </div>
                         </div>
                     )}
                     {(inv.status === "EXCEPTION" || inv.status === "DISPUTED") && (
-                        <div className="space-y-2">
-                            <p className="text-amber-600 font-medium">A match exception was detected. Review the exceptions above and take action.</p>
-                            <div className="flex gap-2 flex-wrap">
-                                <Button variant="outline" size="sm" onClick={async () => {
-                                    const reason = window.prompt("Override reason (min 10 chars):");
-                                    if (!reason || reason.length < 10) return;
-                                    try {
-                                        await api.post(`/invoices/${inv.id}/override`, { reason });
-                                        const updated = await invoiceService.get(inv.id);
-                                        setInv(updated);
-                                        toast.success("Invoice overridden");
-                                    } catch { toast.error("Override failed"); }
-                                }}>Override Match</Button>
+                        <div className="space-y-4">
+                            <p className="text-red-600 font-bold text-lg">Raised Exception to the vendor.</p>
+                            <div className="pt-2 border-t space-y-3">
+                                <p className="text-sm text-muted-foreground mb-2">A match exception was detected or manually raised. The vendor has been notified.</p>
+                                <div className="flex gap-2 flex-wrap">
+                                    <Button variant="outline" size="sm" onClick={async () => {
+                                        const reason = window.prompt("Override reason (min 10 chars):");
+                                        if (!reason || reason.length < 10) return;
+                                        try {
+                                            await api.post(`/invoices/${inv.id}/override`, { reason });
+                                            const updated = await invoiceService.get(inv.id);
+                                            setInv(updated);
+                                            toast.success("Invoice overridden");
+                                        } catch { toast.error("Override failed"); }
+                                    }}>Override Match (Approve Anyway)</Button>
+                                </div>
                             </div>
                         </div>
                     )}
                     {inv.status === "PAID" && (
-                        <p className="text-muted-foreground">This invoice has been paid.</p>
+                        <p className="text-green-700 font-bold text-lg">Payment Completed.</p>
                     )}
                 </CardContent>
             </Card>
@@ -267,6 +280,37 @@ export default function InvoiceDetailPage() {
                         <AlertDialogAction onClick={handleMarkPaid} disabled={markingPaid}>
                             {markingPaid && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Mark as Paid
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={raiseExceptionOpen} onOpenChange={setRaiseExceptionOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Raise Exception</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Reject this invoice and send it back to the vendor. Please provide a reason.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-2 my-2">
+                        <Label htmlFor="exceptionReason">Exception Reason</Label>
+                        <Textarea
+                            id="exceptionReason"
+                            placeholder="e.g. Total amount does not match PO, line item missing..."
+                            value={exceptionReason}
+                            onChange={(e) => setExceptionReason(e.target.value)}
+                            disabled={raisingException}
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={raisingException}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleRaiseException}
+                            disabled={raisingException || exceptionReason.length < 5}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {raisingException && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Raise Exception
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

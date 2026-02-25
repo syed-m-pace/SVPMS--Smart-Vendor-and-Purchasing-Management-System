@@ -274,17 +274,16 @@ async def dispute_invoice(
     invoice_id: str,
     body: InvoiceDisputeRequest,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("vendor")),
+    _auth: None = Depends(require_roles("vendor", "manager", "admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
-    # Verify the vendor owns this invoice
-    vendor = await resolve_vendor_for_user(db, current_user)
-    if not vendor:
-        raise HTTPException(status_code=403, detail="No vendor record linked to your account")
-
-    result = await db.execute(
-        select(Invoice).where(Invoice.id == invoice_id, Invoice.vendor_id == vendor.id)
-    )
+    if current_user["role"] == "vendor":
+        vendor = await resolve_vendor_for_user(db, current_user)
+        if not vendor:
+            raise HTTPException(status_code=403, detail="No vendor record linked to your account")
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id, Invoice.vendor_id == vendor.id))
+    else:
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
     inv = result.scalar_one_or_none()
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -365,7 +364,7 @@ async def approve_payment(
     body: InvoicePaymentActionRequest,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("finance_head", "cfo", "admin")),
+    _auth: None = Depends(require_roles("finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(
@@ -427,7 +426,7 @@ async def mark_paid(
     body: InvoicePaymentActionRequest,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    _auth: None = Depends(require_roles("finance_head", "cfo", "admin")),
+    _auth: None = Depends(require_roles("finance_head", "cfo", "admin", "manager")),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     result = await db.execute(
