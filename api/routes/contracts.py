@@ -197,7 +197,7 @@ async def create_contract(
     body: ContractCreate,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(
-        require_roles("admin", "procurement_lead", "procurement", "finance_head", "cfo")
+        require_roles("admin", "procurement_lead", "procurement", "manager", "finance_head", "cfo")
     ),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
@@ -253,7 +253,7 @@ async def update_contract(
     body: ContractUpdate,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(
-        require_roles("admin", "procurement_lead", "finance_head", "cfo")
+        require_roles("admin", "procurement_lead", "manager", "finance_head", "cfo")
     ),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
@@ -300,7 +300,7 @@ async def activate_contract(
     contract_id: str,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(
-        require_roles("admin", "procurement_lead", "finance_head", "cfo")
+        require_roles("admin", "procurement_lead", "manager", "finance_head", "cfo")
     ),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):

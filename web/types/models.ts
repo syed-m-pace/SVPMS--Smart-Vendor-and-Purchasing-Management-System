@@ -276,6 +276,29 @@ export interface RFQ {
     bids?: RFQBid[];
 }
 
+export type ContractStatus = "DRAFT" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+
+export interface Contract {
+    id: string;
+    contract_number: string;
+    vendor_id: string;
+    vendor_name?: string | null;
+    po_id?: string | null;
+    title: string;
+    description?: string | null;
+    status: ContractStatus;
+    value_cents?: number | null;
+    currency: string;
+    start_date: string;
+    end_date: string;
+    auto_renew: boolean;
+    renewal_notice_days: number;
+    sla_terms?: string | null;
+    document_key?: string | null;
+    terminated_at?: string | null;
+    created_at: string;
+}
+
 /* ── API Response Wrappers ── */
 export interface PaginatedResponse<T> {
     data: T[];

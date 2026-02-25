@@ -13,6 +13,7 @@ import {
     AlertTriangle,
     Package,
     BarChart2,
+    Briefcase,
     ChevronLeft,
     ChevronRight,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
     { label: "Receipts", href: "/receipts", icon: Receipt },
     { label: "Invoices", href: "/invoices", icon: Package },
     { label: "Vendors", href: "/vendors", icon: Users },
+    { label: "Contracts", href: "/contracts", icon: Briefcase },
     { label: "Budgets", href: "/budgets", icon: Wallet },
     {
         label: "Analytics",
