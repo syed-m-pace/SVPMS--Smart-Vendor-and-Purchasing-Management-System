@@ -35,8 +35,7 @@ export default function PurchaseRequestsPage() {
     const filteredPrs = search
         ? prs.filter((pr) =>
             pr.pr_number?.toLowerCase().includes(search.toLowerCase()) ||
-            pr.description?.toLowerCase().includes(search.toLowerCase()) ||
-            pr.title?.toLowerCase().includes(search.toLowerCase())
+            pr.description?.toLowerCase().includes(search.toLowerCase())
         )
         : prs;
 
