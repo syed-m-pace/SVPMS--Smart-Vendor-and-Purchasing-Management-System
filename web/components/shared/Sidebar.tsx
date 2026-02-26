@@ -73,7 +73,7 @@ export function Sidebar() {
             <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
                 {sidebarOpen && (
                     <Link href="/" className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white font-bold text-sm">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white font-bold text-sm">
                             S
                         </div>
                         <span className="text-lg font-bold tracking-tight">SVPMS</span>
@@ -104,8 +104,8 @@ export function Sidebar() {
                             className={cn(
                                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                                 isActive
-                                    ? "bg-accent text-white shadow-md shadow-accent/25"
-                                    : "text-sidebar-foreground/70 hover:bg-white/8 hover:text-sidebar-foreground"
+                                    ? "bg-white/15 text-white shadow-md shadow-black/10"
+                                    : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-white"
                             )}
                             title={!sidebarOpen ? item.label : undefined}
                         >

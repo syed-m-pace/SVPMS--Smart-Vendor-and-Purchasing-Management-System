@@ -6,12 +6,14 @@ import { ArrowLeft, CheckCircle, Ban, Loader2, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { vendorService } from "@/lib/api/vendors";
+import { contractService } from "@/lib/api/contracts";
 import { useAuthStore } from "@/lib/stores/auth";
 import { formatDate } from "@/lib/utils";
-import type { Vendor } from "@/types/models";
+import type { Vendor, Contract } from "@/types/models";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,22 +30,33 @@ export default function VendorDetailPage() {
     const [processing, setProcessing] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Vendor> & { bank_account_number?: string }>({});
+    const [approveOpen, setApproveOpen] = useState(false);
+    const [availableContracts, setAvailableContracts] = useState<Contract[]>([]);
+    const [selectedContracts, setSelectedContracts] = useState<string[]>([]);
 
     useEffect(() => {
         vendorService.get(params.id as string).then(setVendor).catch(() => toast.error("Failed to load vendor")).finally(() => setLoading(false));
     }, [params.id]);
 
-    if (loading) return <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-accent" /></div>;
-    if (!vendor) return <p>Vendor not found</p>;
     const canApprove = ["admin", "manager", "procurement_lead"].includes(user?.role || "");
     const canBlock = ["admin", "manager", "procurement_lead"].includes(user?.role || "");
+
+    useEffect(() => {
+        if (canApprove) {
+            contractService.list({ limit: 100, status: "ACTIVE" }).then(res => setAvailableContracts(res.data)).catch(console.error);
+        }
+    }, [canApprove]);
+
+    if (loading) return <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-accent" /></div>;
+    if (!vendor) return <p>Vendor not found</p>;
 
     async function handleApprove() {
         setProcessing(true);
         try {
-            const updated = await vendorService.approve(vendor!.id);
+            const updated = await vendorService.approve(vendor!.id, selectedContracts);
             toast.success("Vendor approved");
             setVendor(updated);
+            setApproveOpen(false);
         } catch {
             toast.error("Failed to approve vendor");
         } finally {
@@ -99,7 +112,7 @@ export default function VendorDetailPage() {
                 </div>
                 <StatusBadge status={vendor.status} />
                 {canApprove && (vendor.status === "DRAFT" || vendor.status === "PENDING_REVIEW") && (
-                    <Button onClick={handleApprove} variant="success" size="sm" disabled={processing}>
+                    <Button onClick={() => setApproveOpen(true)} variant="success" size="sm" disabled={processing}>
                         {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                         Approve
                     </Button>
@@ -125,6 +138,54 @@ export default function VendorDetailPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Approve Vendor</DialogTitle>
+                        <DialogDescription>
+                            Approving this vendor will generate their credentials and send a welcome email.
+                            You can optionally assign Master Contracts to them below.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                        <Label>Assign Master Contracts (Optional)</Label>
+                        {availableContracts.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No active master contracts available.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {availableContracts.map(c => (
+                                    <div key={c.id} className="flex items-start space-x-3">
+                                        <Checkbox 
+                                            id={`contract-${c.id}`} 
+                                            checked={selectedContracts.includes(c.id)}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) setSelectedContracts(prev => [...prev, c.id]);
+                                                else setSelectedContracts(prev => prev.filter(id => id !== c.id));
+                                            }}
+                                        />
+                                        <div className="grid gap-1.5 leading-none">
+                                            <label htmlFor={`contract-${c.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                                                {c.title}
+                                            </label>
+                                            <p className="text-sm text-muted-foreground">
+                                                {c.contract_number}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setApproveOpen(false)} disabled={processing}>Cancel</Button>
+                        <Button onClick={handleApprove} disabled={processing} className="bg-success text-white hover:bg-success/90">
+                            {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Approve Vendor
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={blockOpen} onOpenChange={setBlockOpen}>
                 <DialogContent>

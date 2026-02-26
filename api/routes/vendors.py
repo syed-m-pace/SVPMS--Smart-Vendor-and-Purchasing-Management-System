@@ -16,11 +16,13 @@ from api.models.vendor import Vendor
 from api.models.purchase_order import PurchaseOrder
 from api.models.audit_log import AuditLog
 from api.models.user import User
+from api.models.contract import ContractVendor
 from api.schemas.vendor import (
     VendorCreate,
     VendorUpdate,
     VendorResponse,
     VendorBlockRequest,
+    VendorApproveRequest,
 )
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
@@ -223,24 +225,6 @@ async def create_vendor(
         bank_account_number_encrypted=body.bank_account_number,
     )
     db.add(vendor)
-
-    temp_password = _generate_vendor_password()
-    if existing_user is None:
-        user = User(
-            tenant_id=current_user["tenant_id"],
-            email=body.email,
-            password_hash=hash_password(temp_password),
-            first_name=body.legal_name,
-            last_name="Vendor",
-            role="vendor",
-            is_active=True,
-        )
-        db.add(user)
-    else:
-        existing_user.is_active = True
-        if not existing_user.password_hash:
-            existing_user.password_hash = hash_password(temp_password)
-
     await db.flush()
 
     await create_audit_log(
@@ -254,21 +238,6 @@ async def create_vendor(
         after_state={"status": vendor.status},
         actor_email=current_user.get("email"),
     )
-
-    if existing_user is None:
-        background_tasks.add_task(
-            send_email,
-            to_emails=[body.email],
-            subject=f"Welcome to {settings.APP_NAME} — Your Vendor Account",
-            html_content=(
-                f"<h2>Welcome to {settings.APP_NAME}!</h2>"
-                f"<p>Your vendor account has been created by our procurement team.</p>"
-                f"<p><strong>Login Email:</strong> {body.email}<br>"
-                f"<strong>Temporary Password:</strong> {temp_password}</p>"
-                f"<p>Please log in and change your password immediately.</p>"
-                f"<p>If you have any questions, contact your procurement point of contact.</p>"
-            ),
-        )
 
     return _to_response(vendor)
 
@@ -332,6 +301,8 @@ async def delete_vendor(
 @router.post("/{vendor_id}/approve", response_model=VendorResponse)
 async def approve_vendor(
     vendor_id: str,
+    body: VendorApproveRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     _auth: None = Depends(require_roles("manager", "procurement_lead", "admin")),
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -348,6 +319,45 @@ async def approve_vendor(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot approve vendor in '{vendor.status}' status",
         )
+
+    existing_user_result = await db.execute(select(User).where(User.email == vendor.email))
+    existing_user = existing_user_result.scalar_one_or_none()
+
+    if existing_user and existing_user.role != "vendor":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already exists for a non-vendor user",
+        )
+
+    temp_password = _generate_vendor_password()
+    newly_created_user = False
+    if existing_user is None:
+        user = User(
+            tenant_id=vendor.tenant_id,
+            email=vendor.email,
+            password_hash=hash_password(temp_password),
+            first_name=vendor.legal_name,
+            last_name="Vendor",
+            role="vendor",
+            is_active=True,
+        )
+        db.add(user)
+        newly_created_user = True
+    else:
+        existing_user.is_active = True
+        if not existing_user.password_hash:
+            existing_user.password_hash = hash_password(temp_password)
+            newly_created_user = True
+
+    if body.contract_ids:
+        for cid in set(body.contract_ids):
+            cv = ContractVendor(
+                tenant_id=vendor.tenant_id,
+                contract_id=cid,
+                vendor_id=vendor.id,
+                status="ACTIVE"
+            )
+            db.add(cv)
 
     before = {"status": vendor.status}
     vendor.status = "ACTIVE"
@@ -366,6 +376,22 @@ async def approve_vendor(
     )
 
     await db.flush()
+
+    if newly_created_user:
+        background_tasks.add_task(
+            send_email,
+            to_emails=[vendor.email],
+            subject=f"Welcome to {settings.APP_NAME} — Your Vendor Account",
+            html_content=(
+                f"<h2>Welcome to {settings.APP_NAME}!</h2>"
+                f"<p>Your vendor account has been approved by our procurement team.</p>"
+                f"<p><strong>Login Email:</strong> {vendor.email}<br>"
+                f"<strong>Temporary Password:</strong> {temp_password}</p>"
+                f"<p>Please log in and change your password immediately.</p>"
+                f"<p>If you have any questions, contact your procurement point of contact.</p>"
+            ),
+        )
+
     return _to_response(vendor)
 
 

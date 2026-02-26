@@ -18,8 +18,9 @@ export const vendorService = {
         const { data } = await api.patch<Vendor>(`/vendors/${id}`, body);
         return data;
     },
-    approve: async (id: string) => {
-        const { data } = await api.post<Vendor>(`/vendors/${id}/approve`);
+    approve: async (id: string, contract_ids?: string[]) => {
+        const payload = contract_ids && contract_ids.length > 0 ? { contract_ids } : {};
+        const { data } = await api.post<Vendor>(`/vendors/${id}/approve`, payload);
         return data;
     },
     block: async (id: string, reason: string) => {

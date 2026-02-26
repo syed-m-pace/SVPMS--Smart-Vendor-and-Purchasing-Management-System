@@ -43,3 +43,7 @@ class VendorResponse(BaseModel):
 
 class VendorBlockRequest(BaseModel):
     reason: str = Field(..., min_length=10)
+
+
+class VendorApproveRequest(BaseModel):
+    contract_ids: Optional[list[str]] = None
