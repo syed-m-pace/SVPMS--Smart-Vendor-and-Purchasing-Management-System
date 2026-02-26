@@ -104,8 +104,14 @@ async def list_invoices(
         scoped_vendor_id = vendor.id
 
     if inv_status:
-        q = q.where(Invoice.status == inv_status)
-        count_q = count_q.where(Invoice.status == inv_status)
+        statuses = [s.strip() for s in inv_status.split(",")]
+        if len(statuses) == 1:
+            q = q.where(Invoice.status == statuses[0])
+            count_q = count_q.where(Invoice.status == statuses[0])
+        else:
+            q = q.where(Invoice.status.in_(statuses))
+            count_q = count_q.where(Invoice.status.in_(statuses))
+
     if scoped_vendor_id is not None:
         q = q.where(Invoice.vendor_id == scoped_vendor_id)
         count_q = count_q.where(Invoice.vendor_id == scoped_vendor_id)

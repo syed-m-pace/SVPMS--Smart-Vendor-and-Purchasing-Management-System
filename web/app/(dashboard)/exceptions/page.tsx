@@ -17,7 +17,7 @@ export default function ExceptionsPage() {
     const [resolving, setResolving] = useState<string | null>(null);
 
     useEffect(() => {
-        invoiceService.list({ status: "EXCEPTION" }).then((r) => setInvoices(r.data)).catch(() => { }).finally(() => setLoading(false));
+        invoiceService.list({ status: "EXCEPTION,DISPUTED" }).then((r) => setInvoices(r.data)).catch(() => { }).finally(() => setLoading(false));
     }, []);
 
     const getErrorMessage = (error: unknown, fallback: string) => {
@@ -67,29 +67,29 @@ export default function ExceptionsPage() {
                             const exceptions = inv.match_exceptions?.exceptions;
                             const issueCount = Array.isArray(exceptions) ? exceptions.length : 0;
                             return (
-                        <Card key={inv.id} className="border-destructive/20">
-                            <CardContent className="p-5 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-4 flex-1">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                                        <AlertTriangle className="h-5 w-5" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium font-mono">{inv.invoice_number}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatCurrency(inv.total_cents)}
-                                            {issueCount ? ` • ${issueCount} issue(s)` : ""}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <StatusBadge status="EXCEPTION" />
-                                    <Button size="sm" onClick={() => handleOverride(inv.id)} disabled={resolving === inv.id}>
-                                        {resolving === inv.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                                        Override
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                <Card key={inv.id} className="border-destructive/20">
+                                    <CardContent className="p-5 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                                                <AlertTriangle className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p className="font-medium font-mono">{inv.invoice_number}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {formatCurrency(inv.total_cents)}
+                                                    {issueCount ? ` • ${issueCount} issue(s)` : ""}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <StatusBadge status="EXCEPTION" />
+                                            <Button size="sm" onClick={() => handleOverride(inv.id)} disabled={resolving === inv.id}>
+                                                {resolving === inv.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                                                Override
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             );
                         })()
                     ))}

@@ -26,7 +26,13 @@ export default function InvoicesPage() {
         setLoading(true);
         try {
             const params: Record<string, any> = { page: p, per_page: 20 };
-            if (s !== "ALL") params.status = s;
+            if (s !== "ALL") {
+                if (s === "EXCEPTION") {
+                    params.status = "EXCEPTION,DISPUTED";
+                } else {
+                    params.status = s;
+                }
+            }
             const res = await invoiceService.list(params);
             setData(res.data);
             setTotalPages(res.pagination.total_pages);
