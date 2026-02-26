@@ -11,6 +11,7 @@ from api.middleware.authorization import require_roles
 from api.models.invoice import Invoice, InvoiceLineItem
 from api.models.purchase_order import PurchaseOrder
 from api.models.vendor import Vendor
+from pydantic import BaseModel
 from api.schemas.invoice import (
     InvoiceCreate,
     InvoiceResponse,
@@ -266,6 +267,83 @@ async def create_invoice(
         )
         logger.info("ocr_queued", invoice_id=str(inv.id))
 
+    return _to_response(inv, line_items)
+
+class InvoiceReuploadRequest(BaseModel):
+    document_key: str
+
+@router.post("/{invoice_id}/reupload", response_model=InvoiceResponse)
+async def reupload_invoice(
+    invoice_id: str,
+    body: InvoiceReuploadRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("vendor", "admin")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    if current_user["role"] == "vendor":
+        vendor = await resolve_vendor_for_user(db, current_user)
+        if not vendor:
+            raise HTTPException(status_code=403, detail="No vendor record linked to your account")
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id, Invoice.vendor_id == vendor.id))
+    else:
+        result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if inv.status not in ("DISPUTED", "EXCEPTION"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only re-upload documents for invoices in DISPUTED or EXCEPTION status",
+        )
+
+    document_key = r2_client.extract_key(body.document_key)
+    if not document_key:
+        raise HTTPException(status_code=400, detail="Invalid document_key")
+        
+    before = {
+        "status": inv.status, 
+        "document_url": inv.document_url,
+        "ocr_status": inv.ocr_status,
+        "match_status": inv.match_status,
+    }
+    
+    inv.document_url = document_key
+    inv.status = "UPLOADED"
+    inv.ocr_data = None
+    inv.ocr_status = None
+    inv.match_status = None
+    inv.match_exceptions = None
+    
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="INVOICE_REUPLOADED",
+        entity_type="INVOICE",
+        entity_id=str(inv.id),
+        before_state=before,
+        after_state={
+            "status": inv.status, 
+            "document_url": inv.document_url,
+            "ocr_status": inv.ocr_status,
+            "match_status": inv.match_status
+        },
+        actor_email=current_user.get("email"),
+    )
+    
+    await db.flush()
+    
+    from api.jobs.invoice_ocr import process_invoice_ocr
+    background_tasks.add_task(
+        process_invoice_ocr, str(inv.id), str(current_user["tenant_id"])
+    )
+    logger.info("invoice_reuploaded", invoice_id=str(inv.id))
+    
+    line_items = await _get_line_items(db, inv.id)
+    return _to_response(inv, line_items)
+
 @router.post("/{invoice_id}/dispute", response_model=InvoiceResponse)
 async def dispute_invoice(
     invoice_id: str,
@@ -292,9 +370,15 @@ async def dispute_invoice(
             detail="Can only dispute invoices in UPLOADED, MATCHED, or EXCEPTION status",
         )
 
-    before = {"status": inv.status}
+    before = {"status": inv.status, "match_exceptions": inv.match_exceptions}
     inv.status = "DISPUTED"
-    after = {"status": inv.status}
+    
+    # Preserve existing exceptions but append the manual dispute note
+    current_exceptions = inv.match_exceptions or {}
+    current_exceptions["manual_dispute_reason"] = body.reason
+    inv.match_exceptions = current_exceptions
+    
+    after = {"status": inv.status, "match_exceptions": inv.match_exceptions}
 
     await create_audit_log(
         db,
@@ -323,6 +407,19 @@ async def dispute_invoice(
             [v_email],
             {"invoice_number": inv.invoice_number, "reason": body.reason},
         )
+        
+    # Create an in-app notification for the vendor
+    from api.models.notification import AppNotification
+    notification = AppNotification(
+        tenant_id=current_user["tenant_id"],
+        vendor_id=inv.vendor_id,
+        title=f"Invoice {inv.invoice_number} Disputed",
+        body=f"Exception raised: {body.reason}",
+        type="invoice",
+        entity_id=str(inv.id)
+    )
+    db.add(notification)
+    await db.flush()
 
     return _to_response(inv, line_items)
 

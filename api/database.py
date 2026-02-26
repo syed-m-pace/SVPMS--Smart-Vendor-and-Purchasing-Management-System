@@ -17,6 +17,7 @@ logger = structlog.get_logger()
 class Base(DeclarativeBase):
     pass
 
+from api.models.notification import AppNotification  # noqa: E402
 
 def _get_db_url() -> str:
     """Strip sslmode from URL since asyncpg uses connect_args for SSL."""

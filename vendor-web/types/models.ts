@@ -193,7 +193,7 @@ export interface AppNotification {
     title: string;
     body: string;
     entity_id?: string;
-    read: boolean;
+    is_read: boolean;
     created_at: string;
 }
 

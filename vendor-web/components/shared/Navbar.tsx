@@ -7,6 +7,8 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useUIStore } from "@/lib/stores/ui";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { useEffect, useState } from "react";
+import { notificationService } from "@/lib/api/notifications";
 
 const breadcrumbMap: Record<string, string> = {
     "/": "Dashboard",
@@ -26,6 +28,15 @@ export function Navbar() {
     const vendor = useAuthStore((s) => s.vendor);
     const toggleSidebar = useUIStore((s) => s.toggleSidebar);
     const pathname = usePathname();
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        if (vendor?.id) {
+            notificationService.getRecent().then(data => {
+                setUnreadCount(data.filter(n => !n.is_read).length);
+            }).catch(console.error);
+        }
+    }, [vendor?.id, pathname]);
 
     // Build breadcrumb segments
     const segments = pathname.split("/").filter(Boolean);
@@ -72,6 +83,11 @@ export function Navbar() {
                 <Link href="/notifications">
                     <Button variant="ghost" size="icon" className="relative">
                         <Bell className="h-5 w-5 text-muted-foreground" />
+                        {unreadCount > 0 && (
+                            <span className="absolute top-1 right-1 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                                {unreadCount > 9 ? "9+" : unreadCount}
+                            </span>
+                        )}
                     </Button>
                 </Link>
 

@@ -147,6 +147,7 @@ from api.routes.analytics import router as analytics_router  # noqa: E402
 from api.routes.fx_rates import router as fx_rates_router  # noqa: E402
 from api.routes.contracts import router as contracts_router  # noqa: E402
 from api.routes.webhooks import router as webhooks_router  # noqa: E402
+from api.routes.notifications import router as notifications_router  # noqa: E402
 
 # Rate limiting middleware (Upstash Redis)
 from api.middleware.rate_limit import rate_limit_middleware  # noqa: E402
@@ -176,3 +177,4 @@ app.include_router(fx_rates_router, prefix="/api/v1/fx-rates", tags=["FX Rates"]
 app.include_router(contracts_router, prefix="/api/v1/contracts", tags=["Contracts"])
 app.include_router(webhooks_router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(jobs_router, prefix="/internal/jobs", tags=["Internal Jobs"])
+app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["Notifications"])

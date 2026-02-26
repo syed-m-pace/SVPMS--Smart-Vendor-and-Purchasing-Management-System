@@ -96,11 +96,9 @@ export default function InvoiceDetailPage() {
 
     if (loading) return <div className="flex justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-accent" /></div>;
     if (!inv) return <p>Invoice not found</p>;
-
     const confidence = readConfidence(inv.ocr_data);
     const ocrInvoiceNumber = typeof inv.ocr_data?.invoice_number === "string" ? inv.ocr_data.invoice_number : null;
     const ocrTotalCents = typeof inv.ocr_data?.total_cents === "number" ? inv.ocr_data.total_cents : null;
-    const exceptionPayload = inv.match_exceptions ? JSON.stringify(inv.match_exceptions, null, 2) : null;
 
     async function openDocument() {
         if (!inv?.document_url) return;
@@ -153,11 +151,25 @@ export default function InvoiceDetailPage() {
                 </CardContent>
             </Card>
 
-            {exceptionPayload && (
-                <Card>
+            {inv.match_exceptions && (
+                <Card className={Boolean(inv.match_exceptions["manual_dispute_reason"]) ? "border-destructive border-2" : ""}>
                     <CardHeader><CardTitle className="text-lg">Match Exceptions</CardTitle></CardHeader>
-                    <CardContent>
-                        <pre className="text-xs overflow-x-auto rounded bg-muted p-3">{exceptionPayload}</pre>
+                    <CardContent className="space-y-4">
+                        {Boolean(inv.match_exceptions["manual_dispute_reason"]) && (
+                            <div className="bg-destructive/10 text-destructive p-4 rounded-md">
+                                <p className="font-semibold text-sm mb-1">Manual Dispute Reason</p>
+                                <p className="text-sm">{String(inv.match_exceptions["manual_dispute_reason"])}</p>
+                            </div>
+                        )}
+                        <pre className="text-xs overflow-x-auto rounded bg-muted p-3">
+                            {JSON.stringify(
+                                Object.fromEntries(
+                                    Object.entries(inv.match_exceptions).filter(([k]) => k !== "manual_dispute_reason")
+                                ),
+                                null,
+                                2
+                            )}
+                        </pre>
                     </CardContent>
                 </Card>
             )}

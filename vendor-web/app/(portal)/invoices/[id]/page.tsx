@@ -12,6 +12,9 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { invoiceService } from "@/lib/api/invoices";
 import { fileService } from "@/lib/api/files";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { useDropzone } from "react-dropzone";
+import { Upload, FileText, X } from "lucide-react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import type { Invoice } from "@/types/models";
 
@@ -40,17 +43,19 @@ function StatusBanner({ status }: { status: string }) {
         case "EXCEPTION":
         case "DISPUTED":
             return (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-warning/10 border border-warning/20">
-                    <AlertTriangle className="h-5 w-5 text-warning" />
-                    <div>
-                        <p className="text-sm font-medium text-warning">
-                            {status === "EXCEPTION" ? "Match Exception Detected" : "Invoice Disputed"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {status === "EXCEPTION"
-                                ? "There is a discrepancy between invoice, PO, and receipt. You can dispute this if you believe it is incorrect."
-                                : "Your dispute has been submitted and is under review."}
-                        </p>
+                <div className="flex flex-col gap-3 p-4 rounded-lg bg-warning/10 border border-warning/20">
+                    <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-warning">
+                                {status === "EXCEPTION" ? "Match Exception Detected" : "Invoice Disputed"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                {status === "EXCEPTION"
+                                    ? "There is a discrepancy between invoice, PO, and receipt. Please review and dispute or re-upload."
+                                    : "This invoice has been disputed or returned. Please re-upload a corrected version."}
+                            </p>
+                        </div>
                     </div>
                 </div>
             );
@@ -88,6 +93,25 @@ export default function InvoiceDetailPage() {
     const [disputeReason, setDisputeReason] = useState("");
     const [disputing, setDisputing] = useState(false);
 
+    const [showReuploadDialog, setShowReuploadDialog] = useState(false);
+    const [reuploading, setReuploading] = useState(false);
+    const [file, setFile] = useState<File | null>(null);
+
+    const onDrop = useCallback((acceptedFiles: File[]) => {
+        if (acceptedFiles.length > 0) setFile(acceptedFiles[0]);
+    }, []);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            "application/pdf": [".pdf"],
+            "image/jpeg": [".jpg", ".jpeg"],
+            "image/png": [".png"],
+        },
+        maxFiles: 1,
+        maxSize: 10 * 1024 * 1024,
+    });
+
     useEffect(() => {
         invoiceService.get(id).then(setInvoice).catch(() => toast.error("Failed to load invoice")).finally(() => setLoading(false));
     }, [id]);
@@ -115,6 +139,23 @@ export default function InvoiceDetailPage() {
             toast.error(err?.response?.data?.detail || "Failed to dispute invoice");
         } finally {
             setDisputing(false);
+        }
+    };
+
+    const handleReupload = async () => {
+        if (!file) return;
+        setReuploading(true);
+        try {
+            const fileResult = await fileService.upload(file);
+            const updated = await invoiceService.reupload(id, fileResult.file_key);
+            setInvoice(updated);
+            setShowReuploadDialog(false);
+            setFile(null);
+            toast.success("Invoice re-uploaded successfully");
+        } catch (err: any) {
+            toast.error(err?.response?.data?.detail || "Failed to re-upload invoice");
+        } finally {
+            setReuploading(false);
         }
     };
 
@@ -156,10 +197,17 @@ export default function InvoiceDetailPage() {
                             <ExternalLink className="h-4 w-4 mr-2" /> View Document
                         </Button>
                     )}
-                    {(invoice.status === "EXCEPTION") && (
-                        <Button variant="destructive" onClick={() => setShowDisputeDialog(true)}>
-                            Dispute
-                        </Button>
+                    {(invoice.status === "EXCEPTION" || invoice.status === "DISPUTED") && (
+                        <div className="flex gap-2">
+                            {invoice.status === "EXCEPTION" && (
+                                <Button variant="destructive" onClick={() => setShowDisputeDialog(true)}>
+                                    Dispute
+                                </Button>
+                            )}
+                            <Button onClick={() => setShowReuploadDialog(true)}>
+                                Re-Upload Invoice
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -259,6 +307,59 @@ export default function InvoiceDetailPage() {
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                             ) : (
                                 "Submit Dispute"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reupload Dialog */}
+            <Dialog open={showReuploadDialog} onOpenChange={setShowReuploadDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Re-Upload Invoice Document</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Upload a corrected or updated document. This will restart the extraction process.
+                        </p>
+                        {file ? (
+                            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
+                                <FileText className="h-5 w-5 text-accent" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{file.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {(file.size / 1024).toFixed(1)} KB
+                                    </p>
+                                </div>
+                                <button type="button" onClick={() => setFile(null)} className="text-muted-foreground hover:text-foreground">
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div
+                                {...getRootProps()}
+                                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isDragActive ? "border-accent bg-accent/5" : "border-border hover:border-accent/50"
+                                    }`}
+                            >
+                                <input {...getInputProps()} />
+                                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                <p className="text-sm text-muted-foreground">
+                                    Drag & drop your invoice here, or click to browse
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    PDF, JPG, PNG — Max 10 MB
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowReuploadDialog(false)}>Cancel</Button>
+                        <Button onClick={handleReupload} disabled={reuploading || !file}>
+                            {reuploading ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            ) : (
+                                "Submit Document"
                             )}
                         </Button>
                     </DialogFooter>

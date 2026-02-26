@@ -29,4 +29,8 @@ export const invoiceService = {
         const { data } = await api.post<Invoice>(`/invoices/${id}/dispute`, { reason });
         return data;
     },
+    reupload: async (id: string, document_key: string) => {
+        const { data } = await api.post<Invoice>(`/invoices/${id}/reupload`, { document_key });
+        return data;
+    }
 };

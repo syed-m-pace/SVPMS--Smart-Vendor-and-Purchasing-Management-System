@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Bell, ShoppingCart, Gavel, Receipt, Banknote, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,18 +10,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { timeAgo } from "@/lib/utils";
 import type { AppNotification } from "@/types/models";
 
-function getStoredNotifications(): AppNotification[] {
-    if (typeof window === "undefined") return [];
-    try {
-        return JSON.parse(localStorage.getItem("vendor_notifications") || "[]");
-    } catch {
-        return [];
-    }
-}
-
-function setStoredNotifications(notifications: AppNotification[]) {
-    localStorage.setItem("vendor_notifications", JSON.stringify(notifications));
-}
+import { notificationService } from "@/lib/api/notifications";
 
 function getIcon(type: string) {
     switch (type) {
@@ -34,15 +24,25 @@ function getIcon(type: string) {
 
 export default function NotificationsPage() {
     const router = useRouter();
-    const [notifications, setNotifications] = useState<AppNotification[]>(getStoredNotifications);
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const handleClick = (n: AppNotification) => {
-        // Mark as read
-        const updated = notifications.map((item) =>
-            item.id === n.id ? { ...item, read: true } : item
-        );
-        setNotifications(updated);
-        setStoredNotifications(updated);
+    useEffect(() => {
+        notificationService.getRecent()
+            .then(setNotifications)
+            .catch(() => toast.error("Failed to load notifications"))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const handleClick = async (n: AppNotification) => {
+        if (!n.is_read) {
+            try {
+                await notificationService.markRead(n.id);
+                setNotifications(notifications.map(item => item.id === n.id ? { ...item, is_read: true } : item));
+            } catch (err) {
+                console.error("Failed to mark as read", err);
+            }
+        }
 
         // Navigate to related entity
         if (n.entity_id) {
@@ -57,9 +57,17 @@ export default function NotificationsPage() {
     };
 
     const handleClearAll = () => {
+        // Requires a clear-all backend endpoint, skipping for now
         setNotifications([]);
-        setStoredNotifications([]);
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-accent" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -88,9 +96,8 @@ export default function NotificationsPage() {
                         return (
                             <Card
                                 key={n.id}
-                                className={`p-4 cursor-pointer hover:shadow-sm transition-shadow ${
-                                    !n.read ? "border-l-4 border-l-accent" : ""
-                                }`}
+                                className={`p-4 cursor-pointer hover:shadow-sm transition-shadow ${!n.is_read ? "border-l-4 border-l-accent" : ""
+                                    }`}
                                 onClick={() => handleClick(n)}
                             >
                                 <div className="flex items-start gap-3">
@@ -98,7 +105,7 @@ export default function NotificationsPage() {
                                         <Icon className="h-4 w-4 text-muted-foreground" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-sm ${!n.read ? "font-semibold" : "font-medium"}`}>
+                                        <p className={`text-sm ${!n.is_read ? "font-semibold" : "font-medium"}`}>
                                             {n.title}
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
