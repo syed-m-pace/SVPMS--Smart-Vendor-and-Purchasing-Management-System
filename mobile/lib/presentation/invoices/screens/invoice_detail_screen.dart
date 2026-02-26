@@ -41,17 +41,19 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     try {
       final repo = context.read<InvoiceRepository>();
       final invoice = await repo.get(widget.invoiceId);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _invoice = invoice;
           _loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+      }
     }
   }
 
@@ -137,6 +139,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       if (result == null || result.files.single.path == null) return;
 
       setState(() => _uploading = true);
+      if (!mounted) return;
       context.read<InvoiceBloc>().add(
         ReuploadInvoice(
           invoiceId: widget.invoiceId,
