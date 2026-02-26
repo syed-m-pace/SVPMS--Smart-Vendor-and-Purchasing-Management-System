@@ -281,8 +281,9 @@ export type ContractStatus = "DRAFT" | "ACTIVE" | "EXPIRED" | "TERMINATED";
 export interface Contract {
     id: string;
     contract_number: string;
-    vendor_id: string;
+    vendor_id?: string | null;
     vendor_name?: string | null;
+    assigned_vendors?: { vendor_id: string; vendor_name: string }[];
     po_id?: string | null;
     title: string;
     description?: string | null;

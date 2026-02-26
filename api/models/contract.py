@@ -35,8 +35,10 @@ class Contract(Base):
         UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
     contract_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    vendor_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("vendors.id"), nullable=False
+    # Changed to nullable=True to support Master Contracts that are not assigned to a vendor yet.
+    # Legacy data will remain, but going forward this column might be empty for standard PDFs.
+    vendor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("vendors.id"), nullable=True
     )
     # Optionally link to a PO that originated this contract
     po_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -76,4 +78,32 @@ class Contract(Base):
         Index("idx_contracts_vendor", "vendor_id"),
         Index("idx_contracts_status", "status"),
         Index("idx_contracts_end_date", "end_date"),
+    )
+
+
+class ContractVendor(Base):
+    """
+    Association table mapping Master Contracts to multiple Vendors.
+    """
+    __tablename__ = "contract_vendors"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    contract_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False
+    )
+    vendor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(50), default="ACTIVE")
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_contract_vendors_tenant", "tenant_id"),
+        Index("idx_contract_vendors_contract", "contract_id"),
+        Index("idx_contract_vendors_vendor", "vendor_id"),
     )

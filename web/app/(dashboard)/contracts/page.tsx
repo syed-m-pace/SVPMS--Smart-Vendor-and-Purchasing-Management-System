@@ -67,7 +67,7 @@ export default function AdminContractsPage() {
             <DataTable
                 columns={[
                     { header: "Contract #", accessorKey: "contract_number" },
-                    { header: "Vendor", cell: (row) => row.vendor_name || row.vendor_id.substring(0, 8) },
+                    { header: "Vendor", cell: (row) => row.vendor_name ? row.vendor_name : (row.vendor_id ? row.vendor_id.substring(0, 8) : "Master (Multiple)") },
                     { header: "Title", accessorKey: "title" },
                     {
                         header: "Status",

@@ -17,7 +17,7 @@ import { isAxiosError } from "axios";
 import { useAuthStore } from "@/lib/stores/auth";
 
 const formSchema = z.object({
-    vendor_id: z.string().min(1, "Vendor ID is required"),
+    vendor_id: z.string().optional(),
     title: z.string().min(3, "Title must be at least 3 characters").max(255),
     description: z.string().optional(),
     value: z.string().optional(),
@@ -65,16 +65,18 @@ export default function NewContractPage() {
     const onSubmit = async (data: FormValues) => {
         setSubmitting(true);
         try {
-            try {
-                await vendorService.get(data.vendor_id);
-            } catch {
-                setError("vendor_id", { message: "Invalid Vendor ID or Vendor not found" });
-                setSubmitting(false);
-                return;
+            if (data.vendor_id && data.vendor_id.trim().length > 0) {
+                try {
+                    await vendorService.get(data.vendor_id.trim());
+                } catch {
+                    setError("vendor_id", { message: "Invalid Vendor ID or Vendor not found" });
+                    setSubmitting(false);
+                    return;
+                }
             }
 
             const payload = {
-                vendor_id: data.vendor_id,
+                vendor_id: data.vendor_id && data.vendor_id.trim() !== "" ? data.vendor_id.trim() : null,
                 title: data.title,
                 description: data.description,
                 start_date: data.start_date,
@@ -116,8 +118,8 @@ export default function NewContractPage() {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <Label htmlFor="vendor_id">Vendor ID *</Label>
-                            <Input id="vendor_id" placeholder="UUID of vendor..." {...register("vendor_id")} />
+                            <Label htmlFor="vendor_id">Vendor ID (Optional)</Label>
+                            <Input id="vendor_id" placeholder="UUID... (leave blank for master contract)" {...register("vendor_id")} />
                             {errors.vendor_id && <p className="text-sm text-destructive">{errors.vendor_id.message}</p>}
                         </div>
                         <div className="space-y-2">

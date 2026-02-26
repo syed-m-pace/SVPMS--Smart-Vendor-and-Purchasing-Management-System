@@ -28,6 +28,10 @@ export const contractService = {
         const { data } = await api.post<Contract>(`/contracts/${id}/terminate`, { reason });
         return data;
     },
+    assignVendors: async (id: string, vendor_ids: string[]) => {
+        const { data } = await api.post(`/contracts/${id}/assign`, { vendor_ids });
+        return data;
+    },
     delete: async (id: string) => {
         await api.delete(`/contracts/${id}`);
     }

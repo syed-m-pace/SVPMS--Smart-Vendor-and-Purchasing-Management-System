@@ -18,8 +18,9 @@ import structlog
 from api.middleware.auth import get_current_user
 from api.middleware.tenant import get_db_with_tenant
 from api.middleware.authorization import require_roles
-from api.models.contract import Contract
+from api.models.contract import Contract, ContractVendor
 from api.models.vendor import Vendor
+from api.models.notification import AppNotification
 from api.schemas.common import PaginatedResponse, build_pagination
 from api.services.audit_service import create_audit_log
 from api.services.notification_service import send_notification
@@ -38,7 +39,7 @@ _PRIVILEGED_ROLES = {
 
 
 class ContractCreate(BaseModel):
-    vendor_id: str
+    vendor_id: Optional[str] = None
     po_id: Optional[str] = None
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -65,11 +66,16 @@ class ContractTerminateRequest(BaseModel):
     reason: str = Field(..., min_length=10, max_length=1000)
 
 
+class AssignedVendorObj(BaseModel):
+    vendor_id: str
+    vendor_name: str
+
 class ContractResponse(BaseModel):
     id: str
     contract_number: str
-    vendor_id: str
+    vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
+    assigned_vendors: list[AssignedVendorObj] = []
     po_id: Optional[str] = None
     title: str
     description: Optional[str] = None
@@ -88,12 +94,15 @@ class ContractResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-def _to_response(c: Contract, vendor_name: Optional[str] = None) -> ContractResponse:
+def _to_response(c: Contract, vendor_name: Optional[str] = None, assigned_vendors: list = None) -> ContractResponse:
+    if assigned_vendors is None:
+        assigned_vendors = []
     return ContractResponse(
         id=str(c.id),
         contract_number=c.contract_number,
-        vendor_id=str(c.vendor_id),
+        vendor_id=str(c.vendor_id) if c.vendor_id else None,
         vendor_name=vendor_name,
+        assigned_vendors=assigned_vendors,
         po_id=str(c.po_id) if c.po_id else None,
         title=c.title,
         description=c.description,
@@ -171,7 +180,30 @@ async def list_contracts(
         .limit(limit)
     )
     rows = result.all()
-    items = [_to_response(row[0], row[1]) for row in rows]
+    items = []
+    
+    # Batch fetch mappings to avoid N+1 queries manually since performance matters
+    if rows:
+        contract_ids = [r[0].id for r in rows]
+        cv_q = select(ContractVendor.contract_id, Vendor.id, Vendor.legal_name)\
+            .join(Vendor, ContractVendor.vendor_id == Vendor.id)\
+            .where(ContractVendor.contract_id.in_(contract_ids))
+        cv_res = await db.execute(cv_q)
+        
+        # Build hash map
+        cv_map = {}
+        for row in cv_res:
+            cid, vid, vname = row
+            if cid not in cv_map:
+                cv_map[cid] = []
+            cv_map[cid].append({"vendor_id": str(vid), "vendor_name": vname})
+            
+        for row in rows:
+            c_obj = row[0]
+            v_name = row[1]
+            mapped_vendors = cv_map.get(c_obj.id, [])
+            items.append(_to_response(c_obj, v_name, mapped_vendors))
+            
     return PaginatedResponse(data=items, pagination=build_pagination(page, limit, total))
 
 
@@ -189,7 +221,14 @@ async def get_contract(
     row = result.one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Contract not found")
-    return _to_response(row[0], row[1])
+        
+    cv_q = select(Vendor.id, Vendor.legal_name)\
+        .join(ContractVendor, ContractVendor.vendor_id == Vendor.id)\
+        .where(ContractVendor.contract_id == contract_id)
+    cv_res = await db.execute(cv_q)
+    assigned_vendors = [{"vendor_id": str(v.id), "vendor_name": v.legal_name} for v in cv_res]
+    
+    return _to_response(row[0], row[1], assigned_vendors)
 
 
 @router.post("", response_model=ContractResponse, status_code=status.HTTP_201_CREATED)
@@ -204,12 +243,14 @@ async def create_contract(
     if body.end_date <= body.start_date:
         raise HTTPException(status_code=400, detail="end_date must be after start_date")
 
-    vendor_result = await db.execute(
-        select(Vendor).where(Vendor.id == body.vendor_id, Vendor.deleted_at.is_(None))
-    )
-    vendor = vendor_result.scalar_one_or_none()
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
+    vendor = None
+    if body.vendor_id:
+        vendor_result = await db.execute(
+            select(Vendor).where(Vendor.id == body.vendor_id, Vendor.deleted_at.is_(None))
+        )
+        vendor = vendor_result.scalar_one_or_none()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found")
 
     contract = Contract(
         tenant_id=current_user["tenant_id"],
@@ -244,7 +285,74 @@ async def create_contract(
         actor_email=current_user.get("email"),
     )
 
-    return _to_response(contract, vendor.legal_name)
+    return _to_response(contract, getattr(vendor, 'legal_name', None))
+
+
+class AssignVendorsRequest(BaseModel):
+    vendor_ids: list[str] = Field(..., min_length=1)
+
+
+@router.post("/{contract_id}/assign", response_model=dict)
+async def assign_vendors(
+    contract_id: str,
+    body: AssignVendorsRequest,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(
+        require_roles("admin", "procurement_lead", "procurement", "manager")
+    ),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """Assign a Master Contract to multiple vendors simultaneously."""
+    # Verify contract exists
+    result = await db.execute(select(Contract).where(Contract.id == contract_id))
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    assigned_count = 0
+    for vid in body.vendor_ids:
+        # Check if already assigned
+        existing = await db.execute(
+            select(ContractVendor).where(
+                ContractVendor.contract_id == contract_id,
+                ContractVendor.vendor_id == vid
+            )
+        )
+        if not existing.scalar_one_or_none():
+            cv = ContractVendor(
+                tenant_id=current_user["tenant_id"],
+                contract_id=contract_id,
+                vendor_id=vid,
+            )
+            db.add(cv)
+            assigned_count += 1
+            
+            # Send initial assignment notification
+            tenant_id = current_user["tenant_id"]
+            db.add(AppNotification(
+                tenant_id=tenant_id,
+                vendor_id=vid,
+                title="New Master Contract Assigned",
+                message=f"You have been assigned to Master Contract {contract.contract_number}.",
+                type="CONTRACT_ASSIGNED",
+                entity_id=str(contract.id)
+            ))
+
+    await db.flush()
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="CONTRACT_VENDORS_ASSIGNED",
+        entity_type="CONTRACT",
+        entity_id=contract_id,
+        before_state={"assigned_vendors_count_added": 0},
+        after_state={"assigned_vendors_count_added": assigned_count, "vendor_ids": body.vendor_ids},
+        actor_email=current_user.get("email"),
+    )
+
+    return {"message": f"Successfully assigned {assigned_count} new vendors."}
 
 
 @router.patch("/{contract_id}", response_model=ContractResponse)
@@ -292,6 +400,39 @@ async def update_contract(
         actor_email=current_user.get("email"),
     )
 
+    # Note: This broadcasts a notification to ALL vendors assigned to this contract.
+    # Check old 1:1 binding
+    assigned_vids = []
+    if contract.vendor_id:
+        assigned_vids.append(str(contract.vendor_id))
+    
+    # Check new 1:M binding
+    cv_result = await db.execute(select(ContractVendor).where(ContractVendor.contract_id == contract_id))
+    for cv in cv_result.scalars().all():
+        assigned_vids.append(str(cv.vendor_id))
+        
+    for vid in set(assigned_vids): 
+        # Add a record to AppNotification (In-App + Mobile Push)
+        db.add(AppNotification(
+            tenant_id=current_user["tenant_id"],
+            vendor_id=vid,
+            title="Contract Updated",
+            message=f"The contract {contract.contract_number} has been modified or replaced.",
+            type="CONTRACT_UPDATED",
+            entity_id=str(contract.id)
+        ))
+        # Add robust email queuing
+        await send_notification(
+            db,
+            tenant_id=current_user["tenant_id"],
+            recipient_id=vid,
+            recipient_type="VENDOR",
+            channel="EMAIL",
+            subject="A Contract has been updated",
+            body=f"Hello, the master contract {contract.contract_number} has been updated. Please log into the portal to review the changes.",
+        )
+    await db.flush()
+
     return _to_response(contract, vendor_name)
 
 
@@ -336,7 +477,11 @@ async def activate_contract(
         actor_email=current_user.get("email"),
     )
 
-    return _to_response(contract, vendor_name)
+    cv_q = select(Vendor.id, Vendor.legal_name).join(ContractVendor, ContractVendor.vendor_id == Vendor.id).where(ContractVendor.contract_id == contract_id)
+    cv_res = await db.execute(cv_q)
+    assigned_vendors = [{"vendor_id": str(v.id), "vendor_name": v.legal_name} for v in cv_res]
+
+    return _to_response(contract, vendor_name, assigned_vendors)
 
 
 @router.post("/{contract_id}/terminate", response_model=ContractResponse)
@@ -382,8 +527,12 @@ async def terminate_contract(
         after_state={"status": contract.status, "reason": reason},
         actor_email=current_user.get("email"),
     )
+    
+    cv_q = select(Vendor.id, Vendor.legal_name).join(ContractVendor, ContractVendor.vendor_id == Vendor.id).where(ContractVendor.contract_id == contract_id)
+    cv_res = await db.execute(cv_q)
+    assigned_vendors = [{"vendor_id": str(v.id), "vendor_name": v.legal_name} for v in cv_res]
 
-    return _to_response(contract, vendor_name)
+    return _to_response(contract, vendor_name, assigned_vendors)
 
 
 @router.delete("/{contract_id}", status_code=status.HTTP_204_NO_CONTENT)

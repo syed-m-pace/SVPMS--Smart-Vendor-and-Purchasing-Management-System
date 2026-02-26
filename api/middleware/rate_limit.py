@@ -41,9 +41,9 @@ _INTERNAL_ROLES = {"procurement", "manager", "finance"}
 
 SKIP_PATHS = {"/health"}
 SKIP_PREFIXES = ("/internal/",)
+from typing import Optional
 
-
-def _extract_jwt_info(request: Request) -> tuple[str, str | None]:
+def _extract_jwt_info(request: Request) -> tuple[str, Optional[str]]:
     """
     Extract user role tier and user_id from JWT payload.
     Returns (tier, user_id) — user_id may be None for unauthenticated requests.
