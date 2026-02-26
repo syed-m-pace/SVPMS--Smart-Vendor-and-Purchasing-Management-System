@@ -12,6 +12,7 @@ class Invoice {
   final String? documentUrl;
   final String? ocrStatus;
   final String? vendorName;
+  final Map<String, dynamic>? matchExceptions;
 
   const Invoice({
     required this.id,
@@ -27,6 +28,7 @@ class Invoice {
     this.documentUrl,
     this.ocrStatus,
     this.vendorName,
+    this.matchExceptions,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class Invoice {
       documentUrl: json['document_url'],
       ocrStatus: json['ocr_status'],
       vendorName: json['vendor_name'],
+      matchExceptions: json['match_exceptions'] as Map<String, dynamic>?,
     );
   }
 }

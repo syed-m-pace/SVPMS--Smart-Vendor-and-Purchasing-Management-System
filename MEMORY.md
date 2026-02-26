@@ -44,6 +44,11 @@
 - Seed vendor user email: changed to `sales@alphasupplies.com` to match vendor record
 - PR approve/reject: implemented
 
+## Phase 4 Additions: Dispute Interactivity & Vendor Alerts
+- **Persistent Match Exceptions**: `dispute_invoice` controller logic saves custom admin disputes inside the `match_exceptions` JSON payload as `manual_dispute_reason`.
+- **Backend App Notifications**: Replaced naive `localStorage` with `AppNotification` DB table. Integrated automatic event emission upon dispute saving.
+- **Vendor Invoice Re-upload**: Established `/{id}/reupload` HTTP endpoint. Vendor sees a "Re-Upload" button on Disputed/Exception invoices. Integrated `react-dropzone` on Vendor Web to replace documents and reset status to `UPLOADED` for OCR re-running.
+
 ## RFQ Award Flow
 - `POST /rfqs/{rfq_id}/award` with `{"bid_id": "..."}` — creates PO from bid, no PR required
 - PO line items sourced from RFQ line items; bid.total_cents distributed by qty across lines

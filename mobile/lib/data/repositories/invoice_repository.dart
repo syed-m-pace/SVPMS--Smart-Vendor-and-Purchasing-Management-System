@@ -18,7 +18,8 @@ class InvoiceRepository {
 
   Future<List<Invoice>> list({String? status, int page = 1}) async {
     final data = await _api.getInvoices(status: status, page: page);
-    final items = data['data'] as List<dynamic>? ?? data['items'] as List<dynamic>? ?? [];
+    final items =
+        data['data'] as List<dynamic>? ?? data['items'] as List<dynamic>? ?? [];
     return items
         .map((e) => Invoice.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -26,6 +27,13 @@ class InvoiceRepository {
 
   Future<Invoice> disputeInvoice(String id, {String? reason}) async {
     final data = await _api.disputeInvoice(id, reason: reason);
+    return Invoice.fromJson(data);
+  }
+
+  Future<Invoice> reuploadInvoice(String id, String filePath) async {
+    final fileData = await _api.uploadFile(filePath);
+    final documentKey = fileData['file_key'];
+    final data = await _api.reuploadInvoice(id, documentKey);
     return Invoice.fromJson(data);
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -23,6 +24,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
   bool _loading = true;
   String? _error;
   bool _openingDoc = false;
+  bool _uploading = false;
 
   @override
   void initState() {
@@ -39,9 +41,17 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     try {
       final repo = context.read<InvoiceRepository>();
       final invoice = await repo.get(widget.invoiceId);
-      if (mounted) setState(() { _invoice = invoice; _loading = false; });
+      if (mounted)
+        setState(() {
+          _invoice = invoice;
+          _loading = false;
+        });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
     }
   }
 
@@ -54,7 +64,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Provide a reason for disputing this invoice (optional):'),
+            const Text(
+              'Provide a reason for disputing this invoice (optional):',
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: reasonController,
@@ -74,12 +86,14 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.read<InvoiceBloc>().add(DisputeInvoice(
-                invoiceId: invoiceId,
-                reason: reasonController.text.trim().isEmpty
-                    ? null
-                    : reasonController.text.trim(),
-              ));
+              context.read<InvoiceBloc>().add(
+                DisputeInvoice(
+                  invoiceId: invoiceId,
+                  reason: reasonController.text.trim().isEmpty
+                      ? null
+                      : reasonController.text.trim(),
+                ),
+              );
             },
             child: const Text('Dispute'),
           ),
@@ -105,12 +119,37 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open document: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to open document: $e')));
       }
     } finally {
       if (mounted) setState(() => _openingDoc = false);
+    }
+  }
+
+  Future<void> _pickAndReupload() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+      );
+      if (result == null || result.files.single.path == null) return;
+
+      setState(() => _uploading = true);
+      context.read<InvoiceBloc>().add(
+        ReuploadInvoice(
+          invoiceId: widget.invoiceId,
+          filePath: result.files.single.path!,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick file: $e')));
+        setState(() => _uploading = false);
+      }
     }
   }
 
@@ -123,10 +162,19 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Invoice disputed successfully')),
           );
-        } else if (state is InvoiceError) {
+        } else if (state is InvoiceReuploaded) {
+          setState(() {
+            _invoice = state.invoice;
+            _uploading = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${state.message}')),
+            const SnackBar(content: Text('Invoice re-uploaded successfully')),
           );
+        } else if (state is InvoiceError) {
+          setState(() => _uploading = false);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${state.message}')));
         }
       },
       child: Scaffold(
@@ -148,10 +196,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           children: [
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _load,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: _load, child: const Text('Retry')),
           ],
         ),
       );
@@ -204,9 +249,15 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   _row('Total', formatCurrency(inv.totalCents)),
                   _row('Currency', inv.currency),
                   if (inv.matchStatus != null)
-                    _rowWidget('Match Status', StatusBadge(status: inv.matchStatus!)),
+                    _rowWidget(
+                      'Match Status',
+                      StatusBadge(status: inv.matchStatus!),
+                    ),
                   if (inv.ocrStatus != null)
-                    _rowWidget('OCR Status', StatusBadge(status: inv.ocrStatus!)),
+                    _rowWidget(
+                      'OCR Status',
+                      StatusBadge(status: inv.ocrStatus!),
+                    ),
                 ],
               ),
             ),
@@ -229,12 +280,26 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                         ),
                       )
                     : const Icon(Icons.open_in_new),
-                label: Text(_openingDoc ? 'Opening...' : 'View Invoice Document'),
+                label: Text(
+                  _openingDoc ? 'Opening...' : 'View Invoice Document',
+                ),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
             ),
+
+          // Match Exceptions section
+          if (inv.matchExceptions != null &&
+              inv.matchExceptions!['manual_dispute_reason'] != null) ...[
+            const SizedBox(height: 16),
+            _statusBanner(
+              icon: Icons.info_outline,
+              color: Colors.red,
+              title: 'Manual Dispute Reason',
+              message: inv.matchExceptions!['manual_dispute_reason'].toString(),
+            ),
+          ],
 
           // ── Status guidance ──
           if (inv.status == 'UPLOADED') ...[
@@ -251,7 +316,8 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             _statusBanner(
               icon: Icons.check_circle_outline,
               color: Colors.green,
-              message: '3-way match passed. This invoice is ready for payment approval.',
+              message:
+                  '3-way match passed. This invoice is ready for payment approval.',
             ),
           ],
           if (inv.status == 'EXCEPTION' || inv.status == 'DISPUTED') ...[
@@ -259,19 +325,42 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             _statusBanner(
               icon: Icons.warning_amber_outlined,
               color: Colors.orange,
-              message:
-                  'A match exception was detected. Contact your procurement team to resolve.',
+              message: inv.status == 'EXCEPTION'
+                  ? 'A match exception was detected. Please review and re-upload or dispute.'
+                  : 'This invoice has been disputed. Please re-upload a corrected version.',
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: _uploading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.upload_file),
+                label: Text(_uploading ? 'Uploading...' : 'Re-upload Invoice'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: _uploading ? null : _pickAndReupload,
+              ),
             ),
             if (inv.status == 'EXCEPTION') ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   icon: const Icon(Icons.report_problem_outlined),
                   label: const Text('Dispute This Invoice'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () => _showDisputeDialog(context, inv.id),
                 ),
@@ -321,6 +410,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     required IconData icon,
     required MaterialColor color,
     required String message,
+    String? title,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -335,9 +425,25 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
           Icon(icon, color: color.shade700, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: color.shade700, fontSize: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null) ...[
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: color.shade900,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Text(
+                  message,
+                  style: TextStyle(color: color.shade700, fontSize: 13),
+                ),
+              ],
             ),
           ),
         ],

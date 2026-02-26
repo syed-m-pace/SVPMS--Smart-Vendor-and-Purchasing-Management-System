@@ -263,6 +263,17 @@ class ApiClient {
     return resp.data;
   }
 
+  Future<Map<String, dynamic>> reuploadInvoice(
+    String id,
+    String documentKey,
+  ) async {
+    final resp = await dio.post(
+      '/api/v1/invoices/$id/reupload',
+      data: {'document_key': documentKey},
+    );
+    return resp.data;
+  }
+
   Future<Map<String, dynamic>> getFilePresignedUrl(String fileKey) async {
     final resp = await dio.get('/api/v1/files/$fileKey');
     return resp.data;
@@ -275,6 +286,22 @@ class ApiClient {
     });
     final resp = await dio.post('/api/v1/files/upload', data: formData);
     return resp.data;
+  }
+
+  // ─── Notifications ────────────────────────────────────
+  Future<Map<String, dynamic>> getNotifications({
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final resp = await dio.get(
+      '/api/v1/notifications',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return resp.data;
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await dio.post('/api/v1/notifications/$id/read');
   }
 
   // ─── Vendors / Users ──────────────────────────────────

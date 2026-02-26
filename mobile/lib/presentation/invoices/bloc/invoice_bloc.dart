@@ -41,6 +41,14 @@ class DisputeInvoice extends InvoiceEvent {
   List<Object?> get props => [invoiceId, reason];
 }
 
+class ReuploadInvoice extends InvoiceEvent {
+  final String invoiceId;
+  final String filePath;
+  ReuploadInvoice({required this.invoiceId, required this.filePath});
+  @override
+  List<Object?> get props => [invoiceId, filePath];
+}
+
 // ─── States ──────────────────────────────────────────────
 abstract class InvoiceState extends Equatable {
   @override
@@ -79,6 +87,13 @@ class InvoiceDisputed extends InvoiceState {
   List<Object?> get props => [invoice];
 }
 
+class InvoiceReuploaded extends InvoiceState {
+  final Invoice invoice;
+  InvoiceReuploaded(this.invoice);
+  @override
+  List<Object?> get props => [invoice];
+}
+
 // ─── Bloc ────────────────────────────────────────────────
 class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   final InvoiceRepository _repo;
@@ -89,6 +104,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<LoadInvoices>(_onLoad);
     on<UploadInvoice>(_onUpload);
     on<DisputeInvoice>(_onDispute);
+    on<ReuploadInvoice>(_onReupload);
   }
 
   Future<void> _onLoad(LoadInvoices event, Emitter<InvoiceState> emit) async {
@@ -131,6 +147,22 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         reason: event.reason,
       );
       emit(InvoiceDisputed(invoice));
+    } catch (e) {
+      emit(InvoiceError(e.toString()));
+    }
+  }
+
+  Future<void> _onReupload(
+    ReuploadInvoice event,
+    Emitter<InvoiceState> emit,
+  ) async {
+    emit(InvoiceLoading());
+    try {
+      final invoice = await _repo.reuploadInvoice(
+        event.invoiceId,
+        event.filePath,
+      );
+      emit(InvoiceReuploaded(invoice));
     } catch (e) {
       emit(InvoiceError(e.toString()));
     }

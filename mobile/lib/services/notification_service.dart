@@ -49,13 +49,36 @@ class AppNotification {
       AppNotification(
         id: json['id'] ?? '',
         title: json['title'] ?? '',
-        body: json['body'] ?? '',
+        body: json['message'] ?? json['body'] ?? '',
         type: json['type'] ?? 'GENERIC',
-        deepLinkPath: json['deepLinkPath'],
+        deepLinkPath:
+            json['deepLinkPath'] ??
+            _buildPath(json['type'] ?? '', json['entity_id']),
         receivedAt:
-            DateTime.tryParse(json['receivedAt'] ?? '') ?? DateTime.now(),
-        isRead: json['isRead'] == true,
+            DateTime.tryParse(json['created_at'] ?? json['receivedAt'] ?? '') ??
+            DateTime.now(),
+        isRead: json['is_read'] == true || json['isRead'] == true,
       );
+
+  static String? _buildPath(String type, String? entityId) {
+    if (entityId == null) return null;
+    switch (type) {
+      case 'NEW_PO':
+      case 'PO_AWARDED':
+        return '/purchase-orders/$entityId';
+      case 'NEW_RFQ':
+        return '/rfqs/$entityId';
+      case 'INVOICE_MATCHED':
+      case 'INVOICE_UPDATE':
+      case 'INVOICE_EXCEPTION':
+      case 'INVOICE_DISPUTE':
+      case 'INVOICE_PAID':
+      case 'PAYMENT_APPROVED':
+        return '/invoices/$entityId';
+      default:
+        return null;
+    }
+  }
 }
 
 class NotificationService {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../services/notification_service.dart' show NotificationService, AppNotification;
+import '../../../data/datasources/api/api_client.dart';
+import '../../../services/notification_service.dart'
+    show NotificationService, AppNotification;
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -21,12 +24,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _load() async {
-    final items = await NotificationService().getStoredNotifications();
-    if (mounted) {
-      setState(() {
-        _notifications = items;
-        _loading = false;
-      });
+    try {
+      final client = context.read<ApiClient>();
+      final resp = await client.getNotifications();
+      final items =
+          (resp['data'] as List<dynamic>?)
+              ?.map(
+                (e) => AppNotification.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .toList() ??
+          [];
+
+      if (mounted) {
+        setState(() {
+          _notifications = items;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load notifications: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _markReadAndGo(AppNotification n) async {
+    if (!n.isRead) {
+      try {
+        await context.read<ApiClient>().markNotificationRead(n.id);
+        setState(() {
+          final index = _notifications.indexWhere((x) => x.id == n.id);
+          if (index != -1) {
+            _notifications[index] = n.copyWith(isRead: true);
+          }
+        });
+      } catch (_) {}
+    }
+    if (n.deepLinkPath != null && mounted) {
+      context.push(n.deepLinkPath!);
     }
   }
 
@@ -92,9 +130,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       trailing: n.deepLinkPath != null
           ? Icon(Icons.chevron_right, color: AppColors.textMuted)
           : null,
-      onTap: n.deepLinkPath != null
-          ? () => context.push(n.deepLinkPath!)
-          : null,
+      onTap: () => _markReadAndGo(n),
     );
   }
 
