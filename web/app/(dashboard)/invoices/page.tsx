@@ -34,6 +34,7 @@ export default function InvoicesPage() {
     const router = useRouter();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
+    const [paginationLoading, setPaginationLoading] = useState(false);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
 
@@ -50,10 +51,11 @@ export default function InvoicesPage() {
     const [statusFilter, setStatusFilter] = useState("");
 
     useEffect(() => {
+        if (!loading) setPaginationLoading(true);
         invoiceService.list({ page, status: statusFilter || undefined }).then((r) => {
             setInvoices(r.data);
             setTotalPages(r.pagination.total_pages);
-        }).catch(() => { }).finally(() => setLoading(false));
+        }).catch(() => { }).finally(() => { setLoading(false); setPaginationLoading(false); });
     }, [page, statusFilter]);
 
     const filteredInvoices = search
@@ -158,7 +160,7 @@ export default function InvoicesPage() {
                     </Button>
                 </div>
             </div>
-            <DataTable columns={columns} data={filteredInvoices} loading={loading} page={page} totalPages={totalPages} onPageChange={setPage} onRowClick={(inv) => router.push(`/invoices/${inv.id}`)} />
+            <DataTable columns={columns} data={filteredInvoices} loading={loading} paginationLoading={paginationLoading} page={page} totalPages={totalPages} onPageChange={setPage} onRowClick={(inv) => router.push(`/invoices/${inv.id}`)} />
 
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                 <DialogContent className="sm:max-w-md">

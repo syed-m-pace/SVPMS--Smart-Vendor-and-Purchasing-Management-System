@@ -19,6 +19,9 @@ router = APIRouter()
 # Roles that see all tenant-wide data (not scoped to dept or vendor)
 _PRIVILEGED_ROLES = {"admin", "finance_head", "cfo", "procurement", "procurement_lead", "finance"}
 
+# Manager also gets full org-wide view on the admin dashboard
+_ORG_WIDE_ROLES = _PRIVILEGED_ROLES | {"manager"}
+
 
 @router.get("/stats")
 async def get_dashboard_stats(
@@ -27,14 +30,12 @@ async def get_dashboard_stats(
 ):
     user_role = current_user.get("role")
     user_id = current_user.get("user_id")
-    department_id = current_user.get("department_id")
 
     # -----------------------------------------------------------------------
     # Determine scope filters based on role
     # -----------------------------------------------------------------------
     is_vendor = user_role == "vendor"
-    is_manager = user_role == "manager"
-    is_privileged = user_role in _PRIVILEGED_ROLES
+    is_org_wide = user_role in _ORG_WIDE_ROLES
 
     vendor_obj = None
     if is_vendor:
@@ -56,19 +57,10 @@ async def get_dashboard_stats(
         PurchaseRequest.status == "PENDING",
         PurchaseRequest.deleted_at == None  # noqa: E711
     )
-    if is_privileged:
-        pass  # all tenant PRs
-    elif is_manager and department_id:
-        pr_q = pr_q.where(
-            or_(
-                PurchaseRequest.department_id == department_id,
-                PurchaseRequest.requester_id == user_id,
-            )
-        )
-    elif is_vendor:
+    if is_vendor:
         # Vendors don't submit PRs — return 0
         pr_q = pr_q.where(PurchaseRequest.requester_id == None)  # noqa: E711
-    else:
+    elif not is_org_wide:
         pr_q = pr_q.where(PurchaseRequest.requester_id == user_id)
 
     # -----------------------------------------------------------------------
@@ -79,36 +71,15 @@ async def get_dashboard_stats(
     )
     if is_vendor and vendor_obj:
         po_q = po_q.where(PurchaseOrder.vendor_id == vendor_obj.id)
-    elif is_manager and department_id:
-        # POs don't have a department_id; scope via the linked PR's department
-        po_q = po_q.join(
-            PurchaseRequest,
-            PurchaseOrder.pr_id == PurchaseRequest.id,
-            isouter=True,
-        ).where(
-            or_(
-                PurchaseRequest.department_id == department_id,
-                PurchaseOrder.pr_id == None,  # noqa: E711 — RFQ-sourced POs visible to all managers
-            )
-        )
-    # else: privileged → all tenant POs
+    # Managers and privileged roles see all tenant POs (org-wide)
 
     # -----------------------------------------------------------------------
-    # 3a. Invoice exceptions (finance/admin view)
+    # 3a. Invoice exceptions
     # -----------------------------------------------------------------------
     inv_q = select(func.count(Invoice.id)).where(Invoice.status.in_(["EXCEPTION", "DISPUTED"]))
     if is_vendor and vendor_obj:
         inv_q = inv_q.where(Invoice.vendor_id == vendor_obj.id)
-    elif is_manager:
-        # Managers see exceptions for invoices linked to their dept's POs
-        inv_q = inv_q.join(PurchaseOrder, Invoice.po_id == PurchaseOrder.id, isouter=True).join(
-            PurchaseRequest, PurchaseOrder.pr_id == PurchaseRequest.id, isouter=True
-        ).where(
-            or_(
-                PurchaseRequest.department_id == department_id,
-                Invoice.po_id == None,  # noqa: E711
-            )
-        )
+    # Managers and privileged roles see all exceptions (org-wide)
 
     # -----------------------------------------------------------------------
     # 3b. Open invoices (for mobile vendor view)
@@ -116,7 +87,7 @@ async def get_dashboard_stats(
     open_inv_q = select(func.count(Invoice.id)).where(Invoice.status != "PAID")
     if is_vendor and vendor_obj:
         open_inv_q = open_inv_q.where(Invoice.vendor_id == vendor_obj.id)
-    elif not is_privileged and not is_manager:
+    elif not is_org_wide:
         open_inv_q = open_inv_q.where(Invoice.vendor_id == None)  # noqa: E711 — empty for others
 
     # -----------------------------------------------------------------------
@@ -135,7 +106,7 @@ async def get_dashboard_stats(
         ).distinct()
 
     # -----------------------------------------------------------------------
-    # 4. Budget utilization (scoped to dept for managers)
+    # 4. Budget utilization (org-wide for managers and privileged roles)
     # -----------------------------------------------------------------------
     fy, q = get_current_fiscal_period()
     budget_q = select(
@@ -145,11 +116,9 @@ async def get_dashboard_stats(
         Budget.fiscal_year == fy,
         Budget.quarter == q
     )
-    # Note: budget utilization shows org-wide value (not scoped to dept)
-    # to match the analytics section.
 
     # -----------------------------------------------------------------------
-    # 5. Invoice status breakdown (for payment chart)
+    # 5. Invoice status breakdown (for payment chart) — org-wide
     # -----------------------------------------------------------------------
     inv_status_q = (
         select(
@@ -160,18 +129,7 @@ async def get_dashboard_stats(
     )
     if is_vendor and vendor_obj:
         inv_status_q = inv_status_q.where(Invoice.vendor_id == vendor_obj.id)
-    elif is_manager and department_id:
-        inv_status_q = (
-            inv_status_q
-            .join(PurchaseOrder, Invoice.po_id == PurchaseOrder.id, isouter=True)
-            .join(PurchaseRequest, PurchaseOrder.pr_id == PurchaseRequest.id, isouter=True)
-            .where(
-                or_(
-                    PurchaseRequest.department_id == department_id,
-                    Invoice.po_id == None,  # noqa: E711
-                )
-            )
-        )
+    # Managers and privileged roles see all invoice statuses (org-wide)
 
     # -----------------------------------------------------------------------
     # 6. Total vendors count
@@ -198,17 +156,6 @@ async def get_dashboard_stats(
     )
     if is_vendor and vendor_obj:
         po_value_q = po_value_q.where(PurchaseOrder.vendor_id == vendor_obj.id)
-    elif is_manager and department_id:
-        po_value_q = (
-            po_value_q
-            .join(PurchaseRequest, PurchaseOrder.pr_id == PurchaseRequest.id, isouter=True)
-            .where(
-                or_(
-                    PurchaseRequest.department_id == department_id,
-                    PurchaseOrder.pr_id == None,  # noqa: E711
-                )
-            )
-        )
 
     pr_res, po_res, inv_res, open_inv_res, rfq_res, budget_res, inv_status_res, vendor_count_res, total_inv_res, po_value_res = await asyncio.gather(
         db.execute(pr_q),

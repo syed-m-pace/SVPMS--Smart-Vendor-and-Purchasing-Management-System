@@ -16,6 +16,7 @@ export default function PurchaseRequestsPage() {
     const router = useRouter();
     const [prs, setPrs] = useState<PurchaseRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [paginationLoading, setPaginationLoading] = useState(false);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [statusFilter, setStatusFilter] = useState("");
@@ -24,12 +25,12 @@ export default function PurchaseRequestsPage() {
     useEffect(() => { load(); }, [page, statusFilter]);
 
     async function load() {
-        setLoading(true);
+        if (!loading) setPaginationLoading(true);
         try {
             const res = await prService.list({ page, status: statusFilter || undefined });
             setPrs(res.data);
             setTotalPages(res.pagination.total_pages);
-        } catch { /* ignore */ } finally { setLoading(false); }
+        } catch { /* ignore */ } finally { setLoading(false); setPaginationLoading(false); }
     }
 
     const filteredPrs = search
@@ -66,7 +67,7 @@ export default function PurchaseRequestsPage() {
                     <Button asChild><Link href="/purchase-requests/new"><Plus className="mr-2 h-4 w-4" />New PR</Link></Button>
                 </div>
             </div>
-            <DataTable columns={columns} data={filteredPrs} loading={loading} page={page} totalPages={totalPages} onPageChange={setPage} onRowClick={(pr) => router.push(`/purchase-requests/${pr.id}`)} />
+            <DataTable columns={columns} data={filteredPrs} loading={loading} paginationLoading={paginationLoading} page={page} totalPages={totalPages} onPageChange={setPage} onRowClick={(pr) => router.push(`/purchase-requests/${pr.id}`)} />
         </div>
     );
 }

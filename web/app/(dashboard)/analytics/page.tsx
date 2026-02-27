@@ -19,18 +19,9 @@ import {
 import { TrendingUp, Users, CheckCircle, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { budgetService } from "@/lib/api/services";
-import { prService } from "@/lib/api/purchase-requests";
-import { poService } from "@/lib/api/purchase-orders";
-import { invoiceService } from "@/lib/api/invoices";
+import { api } from "@/lib/api/client";
 import { vendorService } from "@/lib/api/vendors";
-import type {
-    Budget,
-    Invoice,
-    Vendor,
-    PurchaseRequest,
-    PurchaseOrder,
-} from "@/types/models";
+import type { Vendor } from "@/types/models";
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const PIE_COLORS = ["#4F46E5", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#F97316"];
@@ -93,93 +84,98 @@ function CountTooltip({ active, payload, label }: any) {
     );
 }
 
+// ── Types for analytics API ────────────────────────────────────────────────
+interface SpendDept {
+    department_id: string;
+    department_name: string;
+    total_budget_cents: number;
+    spent_cents: number;
+    reserved_cents: number;
+    available_cents: number;
+    utilization_pct: number;
+}
+interface SpendVendor {
+    vendor_id: string;
+    vendor_name: string;
+    total_spent_cents: number;
+    po_count: number;
+}
+interface MonthlyTrend {
+    year: number;
+    month: number;
+    label: string;
+    total_cents: number;
+    invoice_count: number;
+}
+interface AnalyticsData {
+    fiscal_year: number;
+    quarter: number;
+    summary: {
+        total_budget_cents: number;
+        total_spent_cents: number;
+        total_reserved_cents: number;
+        available_cents: number;
+        budget_utilization_pct: number;
+        total_po_spend_cents: number;
+    };
+    spend_by_department: SpendDept[];
+    spend_by_vendor: SpendVendor[];
+    pr_pipeline: Record<string, number>;
+    monthly_invoice_trend: MonthlyTrend[];
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
     const [loading, setLoading] = useState(true);
-    const [budgets, setBudgets] = useState<Budget[]>([]);
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [vendors, setVendors] = useState<Vendor[]>([]);
-    const [prs, setPrs] = useState<PurchaseRequest[]>([]);
-    const [pos, setPos] = useState<PurchaseOrder[]>([]);
 
     useEffect(() => {
         Promise.allSettled([
-            budgetService.list({ limit: 25 }),
-            invoiceService.list({ limit: 25 }),
+            api.get("/analytics/spend").then((r: { data: AnalyticsData }) => r.data as AnalyticsData),
             vendorService.list({ limit: 25 }),
-            prService.list({ limit: 25 }),
-            poService.list({ limit: 25 }),
         ])
-            .then(([b, inv, v, pr, po]) => {
-                setBudgets(b.status === "fulfilled" ? b.value.data : []);
-                setInvoices(inv.status === "fulfilled" ? inv.value.data : []);
+            .then(([a, v]) => {
+                if (a.status === "fulfilled") setAnalytics(a.value);
                 setVendors(v.status === "fulfilled" ? v.value.data : []);
-                setPrs(pr.status === "fulfilled" ? pr.value.data : []);
-                setPos(po.status === "fulfilled" ? po.value.data : []);
             })
             .finally(() => setLoading(false));
     }, []);
 
-    // ── KPIs ────────────────────────────────────────────────────────────────
-    const totalPOSpend = pos
-        .filter((p) => !["DRAFT", "CANCELLED"].includes(p.status))
-        .reduce((s, p) => s + p.total_cents, 0);
-
-    const matchedCount = invoices.filter(
-        (i) => i.status === "MATCHED" || i.match_status === "MATCHED",
-    ).length;
-    const matchRate = invoices.length > 0 ? Math.round((matchedCount / invoices.length) * 100) : 0;
-
+    // ── Derived data from analytics API ─────────────────────────────────────
+    const summary = analytics?.summary;
+    const totalPOSpend = summary?.total_po_spend_cents ?? 0;
+    const totalBudget = summary?.total_budget_cents ?? 0;
+    const totalConsumed = summary?.total_spent_cents ?? 0;
+    const budgetPct = summary?.budget_utilization_pct ?? 0;
     const activeVendors = vendors.filter((v) => v.status === "ACTIVE").length;
 
-    const totalBudget = budgets.reduce((s, b) => s + b.total_cents, 0);
-    const totalConsumed = budgets.reduce((s, b) => s + b.spent_cents + b.reserved_cents, 0);
-    const budgetPct = totalBudget > 0 ? Math.round((totalConsumed / totalBudget) * 100) : 0;
-
-    // ── Chart Data ──────────────────────────────────────────────────────────
-
-    // 1. Spend by Department (stacked bar)
-    const deptSpend = budgets.map((b) => ({
-        dept: b.department?.name ?? `Dept ${b.department_id.slice(0, 6)}`,
-        Spent: Math.round(b.spent_cents / 100),
-        Reserved: Math.round(b.reserved_cents / 100),
-        Available: Math.round(
-            Math.max(b.total_cents - b.spent_cents - b.reserved_cents, 0) / 100,
-        ),
-        total: Math.round(b.total_cents / 100),
+    // 1. Spend by Department (grouped bar — one row per department, pre-aggregated)
+    const deptSpend = (analytics?.spend_by_department ?? []).map((d) => ({
+        dept: d.department_name,
+        Spent: Math.round(d.spent_cents / 100),
+        Budget: Math.round(d.total_budget_cents / 100),
+        utilization_pct: d.utilization_pct,
     }));
 
-    // 2. Invoice Status Pie
-    const invoiceStatusData = Object.entries(groupBy(invoices, (i) => i.status)).map(
-        ([status, items]) => ({ name: status, value: items.length }),
-    );
-
-    // 3. PR Pipeline horizontal bar
+    // 2. PR Pipeline from analytics
+    const prPipeline = analytics?.pr_pipeline ?? {};
     const prPipelineData = ["DRAFT", "PENDING", "APPROVED", "REJECTED", "CANCELLED"].map(
         (s) => ({
             status: s,
-            count: prs.filter((p) => p.status === s).length,
+            count: prPipeline[s] ?? 0,
             fill: STATUS_COLOR[s] ?? "#94A3B8",
         }),
     );
 
-    // 4. Top 5 Vendors by PO value
-    const vendorSpend = Object.entries(
-        groupBy(
-            pos.filter((p) => p.vendor_name),
-            (p) => p.vendor_name!,
-        ),
-    )
-        .map(([vendor, orders]) => ({
-            vendor: vendor.length > 22 ? vendor.slice(0, 22) + "…" : vendor,
-            "PO Value": Math.round(
-                orders.reduce((s, o) => s + o.total_cents, 0) / 100,
-            ),
-        }))
-        .sort((a, b) => b["PO Value"] - a["PO Value"])
-        .slice(0, 5);
+    // 3. Top Vendors by PO value (from analytics)
+    const vendorSpend = (analytics?.spend_by_vendor ?? []).slice(0, 5).map((v) => ({
+        vendor:
+            v.vendor_name.length > 22 ? v.vendor_name.slice(0, 22) + "…" : v.vendor_name,
+        "PO Value": Math.round(v.total_spent_cents / 100),
+    }));
 
-    // 5. Vendor Status Pie
+    // 4. Vendor Status Pie
     const vendorStatusData = Object.entries(groupBy(vendors, (v) => v.status)).map(
         ([status, items]) => ({
             name: status.replace(/_/g, " "),
@@ -188,30 +184,17 @@ export default function AnalyticsPage() {
         }),
     );
 
-    // 6. Monthly Invoice Spend (line) — sorted chronologically
-    const monthMap: Record<string, { amount: number; sort: number }> = {};
-    invoices.forEach((inv) => {
-        if (!inv.created_at) return;
-        const d = new Date(inv.created_at);
-        const sort = d.getFullYear() * 100 + d.getMonth();
-        const label = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
-        if (!monthMap[label]) monthMap[label] = { amount: 0, sort };
-        monthMap[label].amount += inv.total_cents;
-    });
-    const monthlyData = Object.entries(monthMap)
-        .sort(([, a], [, b]) => a.sort - b.sort)
-        .map(([month, { amount }]) => ({
-            month,
-            "Invoice Spend": Math.round(amount / 100),
-        }));
+    // 5. Monthly Invoice Spend (from analytics — already aggregated)
+    const monthlyData = (analytics?.monthly_invoice_trend ?? []).map((m) => ({
+        month: m.label,
+        "Invoice Spend": Math.round(m.total_cents / 100),
+        "Invoice Count": m.invoice_count,
+    }));
 
-    // 7. Match status breakdown (donut)
+    // 6. Invoice status breakdown from PR pipeline (approximate)
+    const invoiceApproved = prPipeline["APPROVED"] ?? 0;
     const matchBreakdown = [
-        { name: "Matched", value: invoices.filter((i) => i.status === "MATCHED").length },
-        { name: "Exception", value: invoices.filter((i) => i.status === "EXCEPTION").length },
-        { name: "Disputed", value: invoices.filter((i) => i.status === "DISPUTED").length },
-        { name: "Uploaded", value: invoices.filter((i) => i.status === "UPLOADED").length },
-        { name: "Paid", value: invoices.filter((i) => i.status === "PAID").length },
+        { name: "Approved", value: invoiceApproved },
     ].filter((d) => d.value > 0);
 
     const matchColors: Record<string, string> = {
@@ -252,9 +235,9 @@ export default function AnalyticsPage() {
                     iconBg="bg-accent/10"
                 />
                 <KpiCard
-                    label="Invoice Match Rate"
-                    value={`${matchRate}%`}
-                    sub={`${matchedCount} of ${invoices.length} invoices matched`}
+                    label={`FY${analytics?.fiscal_year ?? ""} Q${analytics?.quarter ?? ""}`}
+                    value={`${budgetPct}%`}
+                    sub="Current quarter budget utilization"
                     icon={<CheckCircle className="h-5 w-5 text-green-500" />}
                     iconBg="bg-green-500/10"
                 />
@@ -284,11 +267,16 @@ export default function AnalyticsPage() {
                 />
             </div>
 
-            {/* ── Spend by Department  +  Budget Utilization Bars ─────────── */}
+            {/* ── Spend by Department (grouped bar) + Budget Utilization ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Spend by Department</CardTitle>
+                        <CardTitle className="text-base">
+                            Department Spend vs Budget
+                            <span className="text-xs font-normal text-muted-foreground ml-2">
+                                (FY{analytics?.fiscal_year} Q{analytics?.quarter})
+                            </span>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {deptSpend.length > 0 ? (
@@ -306,9 +294,8 @@ export default function AnalyticsPage() {
                                     />
                                     <Tooltip content={<CurrencyTooltip />} />
                                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                                    <Bar dataKey="Spent" stackId="a" fill="#4F46E5" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="Reserved" stackId="a" fill="#A5B4FC" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="Available" stackId="a" fill="#E2E8F0" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="Spent" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="Budget" fill="#E2E8F0" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -319,31 +306,22 @@ export default function AnalyticsPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Budget Utilization by Department</CardTitle>
+                        <CardTitle className="text-base">
+                            Budget Utilization by Department
+                            <span className="text-xs font-normal text-muted-foreground ml-2">
+                                (FY{analytics?.fiscal_year} Q{analytics?.quarter})
+                            </span>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {deptSpend.length > 0 ? (
                             <div className="space-y-5 py-1">
                                 {deptSpend.map((d) => {
-                                    const pct =
-                                        d.total > 0
-                                            ? Math.min(
-                                                Math.round(((d.Spent + d.Reserved) / d.total) * 100),
-                                                100,
-                                            )
-                                            : 0;
+                                    const pct = d.Budget > 0 ? Math.min(Math.round((d.Spent / d.Budget) * 100), 100) : 0;
                                     const color =
-                                        pct >= 90
-                                            ? "bg-red-500"
-                                            : pct >= 70
-                                                ? "bg-amber-500"
-                                                : "bg-green-500";
+                                        pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-green-500";
                                     const textColor =
-                                        pct >= 90
-                                            ? "text-red-500"
-                                            : pct >= 70
-                                                ? "text-amber-500"
-                                                : "text-green-600";
+                                        pct >= 90 ? "text-red-500" : pct >= 70 ? "text-amber-500" : "text-green-600";
                                     return (
                                         <div key={d.dept}>
                                             <div className="flex justify-between text-xs mb-1.5">
@@ -359,8 +337,7 @@ export default function AnalyticsPage() {
                                                 />
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                ₹{(d.Spent + d.Reserved).toLocaleString("en-IN")} spent
-                                                &amp; reserved of ₹{d.total.toLocaleString("en-IN")}
+                                                ₹{d.Spent.toLocaleString("en-IN")} spent of ₹{d.Budget.toLocaleString("en-IN")}
                                             </p>
                                         </div>
                                     );
@@ -373,46 +350,8 @@ export default function AnalyticsPage() {
                 </Card>
             </div>
 
-            {/* ── Invoice Status  +  PR Pipeline ──────────────────────────── */}
+            {/* ── PR Pipeline + Top Vendors ──────────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Invoice Status Distribution</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {matchBreakdown.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={280}>
-                                <PieChart>
-                                    <Pie
-                                        data={matchBreakdown}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={65}
-                                        outerRadius={105}
-                                        paddingAngle={3}
-                                        dataKey="value"
-                                    >
-                                        {matchBreakdown.map((entry) => (
-                                            <Cell
-                                                key={entry.name}
-                                                fill={matchColors[entry.name] ?? "#94A3B8"}
-                                            />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        formatter={(v: number | undefined, name: string | undefined) => [
-                                            `${v ?? 0} invoice${(v ?? 0) !== 1 ? "s" : ""}`,
-                                            name ?? "",
-                                        ]}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <EmptyChart label="No invoice data" />
-                        )}
-                    </CardContent>
-                </Card>
 
                 <Card>
                     <CardHeader>

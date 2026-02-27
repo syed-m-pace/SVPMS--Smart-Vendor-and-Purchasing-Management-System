@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ interface DataTableProps<T> {
     onPageChange?: (page: number) => void;
     onRowClick?: (row: T) => void;
     emptyMessage?: string;
+    paginationLoading?: boolean;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -31,6 +32,7 @@ export function DataTable<T extends Record<string, any>>({
     onPageChange,
     onRowClick,
     emptyMessage = "No data found.",
+    paginationLoading = false,
 }: DataTableProps<T>) {
     if (loading) {
         return (
@@ -45,7 +47,16 @@ export function DataTable<T extends Record<string, any>>({
 
     return (
         <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto relative">
+                {/* Pagination loading overlay */}
+                {paginationLoading && (
+                    <div className="absolute inset-0 bg-card/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                        <div className="flex items-center gap-2 bg-background/90 px-4 py-2 rounded-lg shadow-sm border">
+                            <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                            <span className="text-sm text-muted-foreground">Loading...</span>
+                        </div>
+                    </div>
+                )}
                 <table className="w-full">
                     <thead>
                         <tr className="border-b bg-muted/50">
@@ -104,14 +115,19 @@ export function DataTable<T extends Record<string, any>>({
             {/* Pagination */}
             {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t px-4 py-3">
-                    <p className="text-sm text-muted-foreground">
-                        Page {page} of {totalPages}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm text-muted-foreground">
+                            Page {page} of {totalPages}
+                        </p>
+                        {paginationLoading && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                        )}
+                    </div>
                     <div className="flex gap-1">
                         <Button
                             variant="outline"
                             size="sm"
-                            disabled={page <= 1}
+                            disabled={page <= 1 || paginationLoading}
                             onClick={() => onPageChange?.(page - 1)}
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -119,7 +135,7 @@ export function DataTable<T extends Record<string, any>>({
                         <Button
                             variant="outline"
                             size="sm"
-                            disabled={page >= totalPages}
+                            disabled={page >= totalPages || paginationLoading}
                             onClick={() => onPageChange?.(page + 1)}
                         >
                             <ChevronRight className="h-4 w-4" />

@@ -18,10 +18,11 @@ export default function AdminContractsPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [paginationLoading, setPaginationLoading] = useState(false);
     const [status, setStatus] = useState("ALL");
 
     const fetchData = async (p: number, s: string) => {
-        setLoading(true);
+        if (!loading) setPaginationLoading(true);
         try {
             const params: Record<string, string | number> = { page: p, per_page: 20 };
             if (s !== "ALL") params.status = s;
@@ -32,6 +33,7 @@ export default function AdminContractsPage() {
             setData([]);
         } finally {
             setLoading(false);
+            setPaginationLoading(false);
         }
     };
 
@@ -88,6 +90,7 @@ export default function AdminContractsPage() {
                 ]}
                 data={data}
                 loading={loading}
+                paginationLoading={paginationLoading}
                 page={page}
                 totalPages={totalPages}
                 onPageChange={setPage}

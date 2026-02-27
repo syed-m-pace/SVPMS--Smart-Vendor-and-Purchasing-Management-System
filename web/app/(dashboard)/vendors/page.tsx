@@ -15,6 +15,7 @@ export default function VendorsPage() {
     const router = useRouter();
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [loading, setLoading] = useState(true);
+    const [paginationLoading, setPaginationLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -24,13 +25,14 @@ export default function VendorsPage() {
     }, [page, search]);
 
     async function load() {
-        setLoading(true);
+        if (!loading) setPaginationLoading(true);
         try {
             const res = await vendorService.list({ page, search: search || undefined });
             setVendors(res.data);
             setTotalPages(res.pagination.total_pages);
         } catch { /* ignore */ } finally {
             setLoading(false);
+            setPaginationLoading(false);
         }
     }
 
@@ -85,6 +87,7 @@ export default function VendorsPage() {
                 columns={columns}
                 data={vendors}
                 loading={loading}
+                paginationLoading={paginationLoading}
                 page={page}
                 totalPages={totalPages}
                 onPageChange={setPage}

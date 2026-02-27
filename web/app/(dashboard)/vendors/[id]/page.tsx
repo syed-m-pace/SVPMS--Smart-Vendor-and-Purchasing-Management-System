@@ -43,7 +43,7 @@ export default function VendorDetailPage() {
 
     useEffect(() => {
         if (canApprove) {
-            contractService.list({ limit: 100, status: "ACTIVE" }).then(res => setAvailableContracts(res.data)).catch(console.error);
+            contractService.list({ limit: 25, status: "ACTIVE" }).then(res => setAvailableContracts(res.data)).catch(console.error);
         }
     }, [canApprove]);
 
@@ -145,19 +145,19 @@ export default function VendorDetailPage() {
                         <DialogTitle>Approve Vendor</DialogTitle>
                         <DialogDescription>
                             Approving this vendor will generate their credentials and send a welcome email.
-                            You can optionally assign Master Contracts to them below.
+                            You must assign at least one Master Contract to them below.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                        <Label>Assign Master Contracts (Optional)</Label>
+                        <Label>Assign Master Contracts <span className="text-red-500">*</span></Label>
                         {availableContracts.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No active master contracts available.</p>
                         ) : (
                             <div className="space-y-3">
                                 {availableContracts.map(c => (
                                     <div key={c.id} className="flex items-start space-x-3">
-                                        <Checkbox 
-                                            id={`contract-${c.id}`} 
+                                        <Checkbox
+                                            id={`contract-${c.id}`}
                                             checked={selectedContracts.includes(c.id)}
                                             onCheckedChange={(checked) => {
                                                 if (checked) setSelectedContracts(prev => [...prev, c.id]);
@@ -179,7 +179,7 @@ export default function VendorDetailPage() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setApproveOpen(false)} disabled={processing}>Cancel</Button>
-                        <Button onClick={handleApprove} disabled={processing} className="bg-success text-white hover:bg-success/90">
+                        <Button onClick={handleApprove} disabled={processing || selectedContracts.length === 0} className="bg-success text-white hover:bg-success/90">
                             {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Approve Vendor
                         </Button>

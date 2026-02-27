@@ -34,6 +34,9 @@ _PRIVILEGED_ROLES = {
     "admin", "finance_head", "cfo", "procurement", "procurement_lead", "finance"
 }
 
+# Manager sees org-wide analytics on the admin portal
+_ORG_WIDE_ROLES = _PRIVILEGED_ROLES | {"manager"}
+
 
 @router.get("/spend")
 async def get_spend_analytics(
@@ -49,21 +52,15 @@ async def get_spend_analytics(
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     """
-    Returns spend analytics scoped to role:
-    - Privileged roles: all tenant data
-    - Manager: scoped to their department
+    Returns spend analytics — org-wide view for all authorized roles.
     """
-    user_role = current_user.get("role")
-    department_id = current_user.get("department_id")
-    is_privileged = user_role in _PRIVILEGED_ROLES
-
     fy, q = get_current_fiscal_period()
     if fiscal_year:
         fy = fiscal_year
     if quarter:
         q = quarter
 
-    # ── 1. Spend by Department (from budgets) ───────────────────────────────
+    # ── 1. Spend by Department (from budgets for the selected quarter) ──────
     dept_q = (
         select(
             Budget.department_id,
@@ -75,10 +72,8 @@ async def get_spend_analytics(
         .where(Budget.fiscal_year == fy, Budget.quarter == q)
         .group_by(Budget.department_id, Department.name)
     )
-    if not is_privileged and department_id:
-        dept_q = dept_q.where(Budget.department_id == department_id)
 
-    # ── 2. Spend by Vendor (from POs) ───────────────────────────────────────
+    # ── 2. Spend by Vendor (from POs — org-wide) ───────────────────────────
     vendor_q = (
         select(
             PurchaseOrder.vendor_id,
@@ -95,14 +90,8 @@ async def get_spend_analytics(
         .order_by(func.sum(PurchaseOrder.total_cents).desc())
         .limit(10)
     )
-    if not is_privileged and department_id:
-        vendor_q = vendor_q.join(
-            PurchaseRequest,
-            PurchaseOrder.pr_id == PurchaseRequest.id,
-            isouter=True,
-        ).where(PurchaseRequest.department_id == department_id)
 
-    # ── 3. PR Pipeline by Status ─────────────────────────────────────────────
+    # ── 3. PR Pipeline by Status (org-wide) ──────────────────────────────────
     pr_status_q = (
         select(
             PurchaseRequest.status,
@@ -111,13 +100,9 @@ async def get_spend_analytics(
         .where(PurchaseRequest.deleted_at.is_(None))
         .group_by(PurchaseRequest.status)
     )
-    if not is_privileged and department_id:
-        pr_status_q = pr_status_q.where(
-            PurchaseRequest.department_id == department_id
-        )
 
-    # ── 4. Monthly Invoice Spend (last 6 months) ────────────────────────────
-    six_months_ago = datetime.utcnow() - timedelta(days=182)
+    # ── 4. Monthly Invoice Spend (last 24 months — org-wide) ─────────────────
+    twenty_four_months_ago = datetime.utcnow() - timedelta(days=730)
     monthly_q = (
         select(
             extract("year", Invoice.created_at).label("year"),
@@ -127,7 +112,7 @@ async def get_spend_analytics(
         )
         .where(
             Invoice.status.notin_(["UPLOADED"]),
-            Invoice.created_at >= six_months_ago,
+            Invoice.created_at >= twenty_four_months_ago,
         )
         .group_by(
             extract("year", Invoice.created_at),
