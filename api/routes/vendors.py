@@ -377,20 +377,31 @@ async def approve_vendor(
 
     await db.flush()
 
+    # Always send an approval email
     if newly_created_user:
-        background_tasks.add_task(
-            send_email,
-            to_emails=[vendor.email],
-            subject=f"Welcome to {settings.APP_NAME} — Your Vendor Account",
-            html_content=(
-                f"<h2>Welcome to {settings.APP_NAME}!</h2>"
-                f"<p>Your vendor account has been approved by our procurement team.</p>"
-                f"<p><strong>Login Email:</strong> {vendor.email}<br>"
-                f"<strong>Temporary Password:</strong> {temp_password}</p>"
-                f"<p>Please log in and change your password immediately.</p>"
-                f"<p>If you have any questions, contact your procurement point of contact.</p>"
-            ),
+        html_content = (
+            f"<h2>Welcome to {settings.APP_NAME}!</h2>"
+            f"<p>Your vendor account has been approved by our procurement team.</p>"
+            f"<p><strong>Login Email:</strong> {vendor.email}<br>"
+            f"<strong>Temporary Password:</strong> {temp_password}</p>"
+            f"<p>Please log in and change your password immediately.</p>"
+            f"<p>If you have any questions, contact your procurement point of contact.</p>"
         )
+    else:
+        html_content = (
+            f"<h2>Welcome back to {settings.APP_NAME}!</h2>"
+            f"<p>Good news! Your vendor account has been officially approved by our procurement team.</p>"
+            f"<p>You can now log in using your existing credentials.</p>"
+            f"<p><strong>Login Email:</strong> {vendor.email}</p>"
+            f"<p>If you have any questions, contact your procurement point of contact.</p>"
+        )
+
+    background_tasks.add_task(
+        send_email,
+        to_emails=[vendor.email],
+        subject=f"Welcome to {settings.APP_NAME} — Your Vendor Account Approved",
+        html_content=html_content,
+    )
 
     return _to_response(vendor)
 
@@ -491,4 +502,42 @@ async def block_vendor(
 
     await db.flush()
     logger.info("vendor_blocked", vendor_id=vendor_id, reason=body.reason, by=current_user["user_id"])
+    return _to_response(vendor)
+
+
+@router.post("/{vendor_id}/unblock", response_model=VendorResponse)
+async def unblock_vendor(
+    vendor_id: str,
+    current_user: dict = Depends(get_current_user),
+    _auth: None = Depends(require_roles("admin", "manager", "procurement_lead")),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    result = await db.execute(
+        select(Vendor).where(Vendor.id == vendor_id, Vendor.deleted_at == None)  # noqa: E711
+    )
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    if vendor.status != "BLOCKED":
+        raise HTTPException(status_code=400, detail="Vendor is not blocked")
+
+    before = {"status": vendor.status}
+    vendor.status = "ACTIVE"
+    after = {"status": vendor.status}
+
+    await create_audit_log(
+        db,
+        tenant_id=current_user["tenant_id"],
+        actor_id=current_user["user_id"],
+        action="VENDOR_UNBLOCKED",
+        entity_type="VENDOR",
+        entity_id=str(vendor.id),
+        before_state=before,
+        after_state=after,
+        actor_email=current_user.get("email"),
+    )
+
+    await db.flush()
+    logger.info("vendor_unblocked", vendor_id=vendor_id, by=current_user["user_id"])
     return _to_response(vendor)

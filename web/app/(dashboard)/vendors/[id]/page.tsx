@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle, Ban, Loader2, Edit2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, Ban, Loader2, Edit2, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,7 @@ export default function VendorDetailPage() {
     const [loading, setLoading] = useState(true);
     const [blockOpen, setBlockOpen] = useState(false);
     const [blockReason, setBlockReason] = useState("");
+    const [unblockOpen, setUnblockOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Vendor> & { bank_account_number?: string }>({});
@@ -76,6 +77,15 @@ export default function VendorDetailPage() {
         } catch { toast.error("Failed"); } finally { setProcessing(false); }
     }
 
+    async function handleUnblock() {
+        setProcessing(true);
+        try {
+            await vendorService.unblock(vendor!.id);
+            toast.success("Vendor unblocked");
+            setVendor({ ...vendor!, status: "ACTIVE" });
+            setUnblockOpen(false);
+        } catch { toast.error("Failed to unblock vendor"); } finally { setProcessing(false); }
+    }
 
     function openEdit() {
         setEditForm({
@@ -119,6 +129,9 @@ export default function VendorDetailPage() {
                 )}
                 {canBlock && vendor.status === "ACTIVE" && (
                     <Button onClick={() => setBlockOpen(true)} variant="destructive" size="sm" disabled={processing}><Ban className="mr-2 h-4 w-4" />Block</Button>
+                )}
+                {canBlock && vendor.status === "BLOCKED" && (
+                    <Button onClick={() => setUnblockOpen(true)} variant="outline" size="sm" disabled={processing}><Unlock className="mr-2 h-4 w-4" />Unblock</Button>
                 )}
                 <Button onClick={openEdit} variant="outline" size="sm" disabled={processing}><Edit2 className="mr-2 h-4 w-4" />Edit</Button>
             </div>
@@ -242,6 +255,23 @@ export default function VendorDetailPage() {
                         <Button onClick={handleUpdate} disabled={processing}>
                             {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={unblockOpen} onOpenChange={setUnblockOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Unblock Vendor</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to unblock {vendor.legal_name}? They will regain access to the vendor portal and new operations can be initiated with them.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setUnblockOpen(false)} disabled={processing}>Cancel</Button>
+                        <Button variant="default" onClick={handleUnblock} disabled={processing}>
+                            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Unblock"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

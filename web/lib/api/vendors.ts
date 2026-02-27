@@ -27,4 +27,8 @@ export const vendorService = {
         const { data } = await api.post<Vendor>(`/vendors/${id}/block`, { reason });
         return data;
     },
+    unblock: async (id: string) => {
+        const { data } = await api.post<Vendor>(`/vendors/${id}/unblock`);
+        return data;
+    },
 };
