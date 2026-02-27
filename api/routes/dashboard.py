@@ -51,8 +51,10 @@ async def get_dashboard_stats(
             }
 
     # -----------------------------------------------------------------------
-    # 1. Pending PRs
+    # 1. Pending PRs — scoped to match the PR list endpoint behaviour
     # -----------------------------------------------------------------------
+    user_dept = current_user.get("department_id")
+
     pr_q = select(func.count(PurchaseRequest.id)).where(
         PurchaseRequest.status == "PENDING",
         PurchaseRequest.deleted_at == None  # noqa: E711
@@ -60,6 +62,14 @@ async def get_dashboard_stats(
     if is_vendor:
         # Vendors don't submit PRs — return 0
         pr_q = pr_q.where(PurchaseRequest.requester_id == None)  # noqa: E711
+    elif user_role == "manager" and user_dept:
+        # Managers see their department + their own PRs only (matches PR list)
+        pr_q = pr_q.where(
+            or_(
+                PurchaseRequest.department_id == user_dept,
+                PurchaseRequest.requester_id == user_id,
+            )
+        )
     elif not is_org_wide:
         pr_q = pr_q.where(PurchaseRequest.requester_id == user_id)
 
