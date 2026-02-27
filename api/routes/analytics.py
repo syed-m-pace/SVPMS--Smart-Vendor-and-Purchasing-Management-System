@@ -70,7 +70,6 @@ async def get_spend_analytics(
             Department.name.label("department_name"),
             func.coalesce(func.sum(Budget.total_cents), 0).label("total_budget"),
             func.coalesce(func.sum(Budget.spent_cents), 0).label("spent"),
-            func.coalesce(func.sum(Budget.reserved_cents), 0).label("reserved"),
         )
         .join(Department, Budget.department_id == Department.id, isouter=True)
         .where(Budget.fiscal_year == fy, Budget.quarter == q)
@@ -156,10 +155,10 @@ async def get_spend_analytics(
             "department_name": r.department_name or "Unknown",
             "total_budget_cents": int(r.total_budget),
             "spent_cents": int(r.spent),
-            "reserved_cents": int(r.reserved),
-            "available_cents": max(int(r.total_budget) - int(r.spent) - int(r.reserved), 0),
+            "reserved_cents": 0,
+            "available_cents": max(int(r.total_budget) - int(r.spent), 0),
             "utilization_pct": (
-                round((int(r.spent) + int(r.reserved)) / int(r.total_budget) * 100, 1)
+                round(int(r.spent) / int(r.total_budget) * 100, 1)
                 if int(r.total_budget) > 0 else 0
             ),
         }
@@ -195,7 +194,6 @@ async def get_spend_analytics(
     # ── Summary totals ────────────────────────────────────────────────────────
     total_budget = sum(d["total_budget_cents"] for d in spend_by_department)
     total_spent = sum(d["spent_cents"] for d in spend_by_department)
-    total_reserved = sum(d["reserved_cents"] for d in spend_by_department)
     total_po_spend = sum(v["total_spent_cents"] for v in spend_by_vendor)
 
     return {
@@ -204,10 +202,10 @@ async def get_spend_analytics(
         "summary": {
             "total_budget_cents": total_budget,
             "total_spent_cents": total_spent,
-            "total_reserved_cents": total_reserved,
-            "available_cents": max(total_budget - total_spent - total_reserved, 0),
+            "total_reserved_cents": 0,
+            "available_cents": max(total_budget - total_spent, 0),
             "budget_utilization_pct": (
-                round((total_spent + total_reserved) / total_budget * 100, 1)
+                round(total_spent / total_budget * 100, 1)
                 if total_budget > 0 else 0
             ),
             "total_po_spend_cents": total_po_spend,

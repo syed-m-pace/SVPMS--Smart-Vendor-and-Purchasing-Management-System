@@ -96,7 +96,7 @@ async def get_dashboard_stats(
     # -----------------------------------------------------------------------
     # 3a. Invoice exceptions (finance/admin view)
     # -----------------------------------------------------------------------
-    inv_q = select(func.count(Invoice.id)).where(Invoice.status == "EXCEPTION")
+    inv_q = select(func.count(Invoice.id)).where(Invoice.status.in_(["EXCEPTION", "DISPUTED"]))
     if is_vendor and vendor_obj:
         inv_q = inv_q.where(Invoice.vendor_id == vendor_obj.id)
     elif is_manager:
@@ -145,8 +145,8 @@ async def get_dashboard_stats(
         Budget.fiscal_year == fy,
         Budget.quarter == q
     )
-    if is_manager and department_id:
-        budget_q = budget_q.where(Budget.department_id == department_id)
+    # Note: budget utilization shows org-wide value (not scoped to dept)
+    # to match the analytics section.
 
     # -----------------------------------------------------------------------
     # 5. Invoice status breakdown (for payment chart)

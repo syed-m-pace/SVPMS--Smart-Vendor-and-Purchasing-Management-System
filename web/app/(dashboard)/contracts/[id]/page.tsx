@@ -90,7 +90,7 @@ export default function ContractDetailPage() {
 
     const handleOpenAssignDialog = async () => {
         try {
-            const resp = await vendorService.list({ limit: 100, status: "ACTIVE" });
+            const resp = await vendorService.list({ limit: 25, status: "ACTIVE" });
             setAllVendors(resp.data);
 
             // Pre-select already assigned vendors
