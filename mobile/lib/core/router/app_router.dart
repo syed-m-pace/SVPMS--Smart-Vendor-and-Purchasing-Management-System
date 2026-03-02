@@ -13,6 +13,9 @@ import '../../presentation/notifications/screens/notifications_screen.dart';
 import '../../presentation/invoices/screens/invoice_list_screen.dart';
 import '../../presentation/invoices/screens/invoice_upload_screen.dart';
 import '../../presentation/invoices/screens/invoice_detail_screen.dart';
+import '../../presentation/contracts/screens/contract_list_screen.dart';
+import '../../presentation/contracts/screens/contract_detail_screen.dart';
+import '../../presentation/analytics/screens/analytics_screen.dart';
 import '../../presentation/profile/screens/profile_screen.dart';
 import 'app_shell.dart';
 
@@ -74,10 +77,23 @@ GoRouter createRouter(StorageService storage, AuthBloc authBloc) {
           ),
 
           GoRoute(
+            path: '/contracts',
+            builder: (context, state) => const ContractListScreen(),
+          ),
+          GoRoute(
+            path: '/analytics',
+            builder: (context, state) => const AnalyticsScreen(),
+          ),
+          GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/contracts/:id',
+        builder: (context, state) =>
+            ContractDetailScreen(contractId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/purchase-orders/:id',

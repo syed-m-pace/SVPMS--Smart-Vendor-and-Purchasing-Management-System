@@ -15,6 +15,7 @@ class RFQListScreen extends StatefulWidget {
 
 class _RFQListScreenState extends State<RFQListScreen> {
   String? _selectedStatus;
+  final _scrollController = ScrollController();
 
   static const _statuses = ['OPEN', 'AWARDED'];
 
@@ -22,6 +23,20 @@ class _RFQListScreenState extends State<RFQListScreen> {
   void initState() {
     super.initState();
     context.read<RFQBloc>().add(LoadRFQs());
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      context.read<RFQBloc>().add(LoadMoreRFQs());
+    }
   }
 
   void _applyFilter(String? status) {
@@ -97,12 +112,19 @@ class _RFQListScreenState extends State<RFQListScreen> {
                   onRefresh: () async =>
                       context.read<RFQBloc>().add(RefreshRFQs()),
                   child: ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    itemCount: state.rfqs.length,
+                    itemCount: state.rfqs.length + (state.hasMore ? 1 : 0),
                     itemBuilder: (context, i) {
+                      if (i >= state.rfqs.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
                       final rfq = state.rfqs[i];
                       final isAwarded = rfq.status == 'AWARDED';
                       final myVendorId = rfq.bids.isNotEmpty

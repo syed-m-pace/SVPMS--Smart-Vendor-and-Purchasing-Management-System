@@ -8,4 +8,8 @@ export const contractService = {
         const { data } = await api.get<PaginatedResponse<Contract>>("/contracts", { params });
         return data;
     },
+    get: async (id: string) => {
+        const { data } = await api.get<Contract>(`/contracts/${id}`);
+        return data;
+    },
 };

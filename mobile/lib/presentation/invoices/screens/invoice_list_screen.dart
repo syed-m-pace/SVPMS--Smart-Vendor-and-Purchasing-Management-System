@@ -16,6 +16,26 @@ class InvoiceListScreen extends StatefulWidget {
 class _InvoiceListScreenState extends State<InvoiceListScreen> {
   String _statusFilter = 'ALL';
   static const _statuses = ['ALL', 'UPLOADED', 'MATCHED', 'EXCEPTION', 'DISPUTED', 'APPROVED', 'PAID'];
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      context.read<InvoiceBloc>().add(LoadMoreInvoices());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,11 +120,18 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: () async =>
-                            context.read<InvoiceBloc>().add(LoadInvoices()),
+                            context.read<InvoiceBloc>().add(RefreshInvoices()),
                         child: ListView.builder(
+                          controller: _scrollController,
                           padding: const EdgeInsets.all(16),
-                          itemCount: filtered.length,
+                          itemCount: filtered.length + (state.hasMore && _statusFilter == 'ALL' ? 1 : 0),
                           itemBuilder: (context, i) {
+                            if (i >= filtered.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
                             final inv = filtered[i];
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),

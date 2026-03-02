@@ -16,6 +16,10 @@ class LoadPOs extends POEvent {
   List<Object?> get props => [status];
 }
 
+class LoadMorePOs extends POEvent {}
+
+class RefreshPOs extends POEvent {}
+
 class LoadPODetail extends POEvent {
   final String id;
   LoadPODetail(this.id);
@@ -43,9 +47,12 @@ class POLoading extends POState {}
 
 class POListLoaded extends POState {
   final List<PurchaseOrder> orders;
-  POListLoaded(this.orders);
+  final bool hasMore;
+  final int page;
+  final bool isLoadingMore;
+  POListLoaded(this.orders, {this.hasMore = true, this.page = 1, this.isLoadingMore = false});
   @override
-  List<Object?> get props => [orders];
+  List<Object?> get props => [orders, hasMore, page, isLoadingMore];
 }
 
 class PODetailLoaded extends POState {
@@ -79,20 +86,48 @@ class POError extends POState {
 // ─── Bloc ────────────────────────────────────────────────
 class POBloc extends Bloc<POEvent, POState> {
   final PORepository _repo;
+  String? _lastStatus;
 
   POBloc({required PORepository repo}) : _repo = repo, super(POInitial()) {
     on<LoadPOs>(_onLoadList);
+    on<LoadMorePOs>(_onLoadMore);
+    on<RefreshPOs>(_onRefresh);
     on<LoadPODetail>(_onLoadDetail);
     on<AcknowledgePO>(_onAcknowledge);
   }
 
   Future<void> _onLoadList(LoadPOs event, Emitter<POState> emit) async {
+    _lastStatus = event.status;
     emit(POLoading());
     try {
-      final orders = await _repo.list(status: event.status);
-      emit(POListLoaded(orders));
+      final orders = await _repo.list(status: event.status, page: 1);
+      emit(POListLoaded(orders, hasMore: orders.length >= 20, page: 1));
     } catch (e) {
       emit(POError(e.toString()));
+    }
+  }
+
+  Future<void> _onRefresh(RefreshPOs event, Emitter<POState> emit) async {
+    try {
+      final orders = await _repo.list(status: _lastStatus, page: 1);
+      emit(POListLoaded(orders, hasMore: orders.length >= 20, page: 1));
+    } catch (e) {
+      emit(POError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadMore(LoadMorePOs event, Emitter<POState> emit) async {
+    final current = state;
+    if (current is! POListLoaded || !current.hasMore || current.isLoadingMore) return;
+
+    emit(POListLoaded(current.orders, hasMore: current.hasMore, page: current.page, isLoadingMore: true));
+    try {
+      final nextPage = current.page + 1;
+      final more = await _repo.list(status: _lastStatus, page: nextPage);
+      final combined = [...current.orders, ...more];
+      emit(POListLoaded(combined, hasMore: more.length >= 20, page: nextPage));
+    } catch (e) {
+      emit(POListLoaded(current.orders, hasMore: current.hasMore, page: current.page));
     }
   }
 

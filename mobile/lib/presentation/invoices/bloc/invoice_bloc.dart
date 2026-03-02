@@ -16,6 +16,10 @@ class LoadInvoices extends InvoiceEvent {
   List<Object?> get props => [status];
 }
 
+class LoadMoreInvoices extends InvoiceEvent {}
+
+class RefreshInvoices extends InvoiceEvent {}
+
 class UploadInvoice extends InvoiceEvent {
   final String poId;
   final String invoiceNumber;
@@ -61,9 +65,12 @@ class InvoiceLoading extends InvoiceState {}
 
 class InvoiceListLoaded extends InvoiceState {
   final List<Invoice> invoices;
-  InvoiceListLoaded(this.invoices);
+  final bool hasMore;
+  final int page;
+  final bool isLoadingMore;
+  InvoiceListLoaded(this.invoices, {this.hasMore = true, this.page = 1, this.isLoadingMore = false});
   @override
-  List<Object?> get props => [invoices];
+  List<Object?> get props => [invoices, hasMore, page, isLoadingMore];
 }
 
 class InvoiceUploaded extends InvoiceState {
@@ -97,23 +104,51 @@ class InvoiceReuploaded extends InvoiceState {
 // ─── Bloc ────────────────────────────────────────────────
 class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   final InvoiceRepository _repo;
+  String? _lastStatus;
 
   InvoiceBloc({required InvoiceRepository repo})
     : _repo = repo,
       super(InvoiceInitial()) {
     on<LoadInvoices>(_onLoad);
+    on<LoadMoreInvoices>(_onLoadMore);
+    on<RefreshInvoices>(_onRefresh);
     on<UploadInvoice>(_onUpload);
     on<DisputeInvoice>(_onDispute);
     on<ReuploadInvoice>(_onReupload);
   }
 
   Future<void> _onLoad(LoadInvoices event, Emitter<InvoiceState> emit) async {
+    _lastStatus = event.status;
     emit(InvoiceLoading());
     try {
-      final invoices = await _repo.list(status: event.status);
-      emit(InvoiceListLoaded(invoices));
+      final invoices = await _repo.list(status: event.status, page: 1);
+      emit(InvoiceListLoaded(invoices, hasMore: invoices.length >= 20, page: 1));
     } catch (e) {
       emit(InvoiceError(e.toString()));
+    }
+  }
+
+  Future<void> _onRefresh(RefreshInvoices event, Emitter<InvoiceState> emit) async {
+    try {
+      final invoices = await _repo.list(status: _lastStatus, page: 1);
+      emit(InvoiceListLoaded(invoices, hasMore: invoices.length >= 20, page: 1));
+    } catch (e) {
+      emit(InvoiceError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadMore(LoadMoreInvoices event, Emitter<InvoiceState> emit) async {
+    final current = state;
+    if (current is! InvoiceListLoaded || !current.hasMore || current.isLoadingMore) return;
+
+    emit(InvoiceListLoaded(current.invoices, hasMore: current.hasMore, page: current.page, isLoadingMore: true));
+    try {
+      final nextPage = current.page + 1;
+      final more = await _repo.list(status: _lastStatus, page: nextPage);
+      final combined = [...current.invoices, ...more];
+      emit(InvoiceListLoaded(combined, hasMore: more.length >= 20, page: nextPage));
+    } catch (e) {
+      emit(InvoiceListLoaded(current.invoices, hasMore: current.hasMore, page: current.page));
     }
   }
 

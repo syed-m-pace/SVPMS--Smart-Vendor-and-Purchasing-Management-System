@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/constants/app_colors.dart';
@@ -369,6 +370,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               subtitle: vendor?.bankAccount != null
                                   ? '•••• ${vendor!.bankAccount!.substring(vendor.bankAccount!.length > 4 ? vendor.bankAccount!.length - 4 : 0)}'
                                   : 'Not Linked',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Quick Access ──
+                      Card(
+                        child: Column(
+                          children: [
+                            _tile(
+                              Icons.description_outlined,
+                              'Contracts',
+                              subtitle: 'View your agreements',
+                              onTap: () => GoRouter.of(context).push('/contracts'),
+                            ),
+                            const Divider(height: 1),
+                            _tile(
+                              Icons.analytics_outlined,
+                              'Analytics',
+                              subtitle: 'Performance scorecard',
+                              onTap: () => GoRouter.of(context).push('/analytics'),
+                            ),
+                            const Divider(height: 1),
+                            _tile(
+                              Icons.notifications_outlined,
+                              'Notifications',
+                              subtitle: 'View all notifications',
+                              onTap: () => GoRouter.of(context).push('/notifications'),
                             ),
                           ],
                         ),

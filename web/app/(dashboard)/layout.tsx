@@ -17,11 +17,17 @@ export default function DashboardLayout({
     const { user, isHydrated } = useAuthStore();
     const sidebarOpen = useUIStore((s) => s.sidebarOpen);
 
+    const logout = useAuthStore((s) => s.logout);
+
     useEffect(() => {
         if (isHydrated && !user) {
             router.replace("/login");
         }
-    }, [isHydrated, user, router]);
+        // Reject vendor accounts that somehow ended up in admin portal
+        if (isHydrated && user && user.role === "vendor") {
+            logout();
+        }
+    }, [isHydrated, user, router, logout]);
 
     if (!isHydrated) {
         return (

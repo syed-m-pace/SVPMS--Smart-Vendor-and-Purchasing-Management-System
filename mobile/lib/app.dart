@@ -9,8 +9,10 @@ import 'data/repositories/auth_repository.dart';
 import 'data/repositories/dashboard_repository.dart';
 import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/po_repository.dart';
+import 'data/repositories/contract_repository.dart';
 import 'data/repositories/rfq_repository.dart';
 import 'presentation/auth/bloc/auth_bloc.dart';
+import 'presentation/contracts/bloc/contract_bloc.dart';
 import 'presentation/dashboard/bloc/dashboard_bloc.dart';
 import 'presentation/invoices/bloc/invoice_bloc.dart';
 import 'presentation/purchase_orders/bloc/po_bloc.dart';
@@ -55,6 +57,7 @@ class SVPMSApp extends StatelessWidget {
     final poRepo = PORepository(api: apiClient, cache: localCache);
     final rfqRepo = RFQRepository(api: apiClient, cache: localCache);
 
+    final contractRepo = ContractRepository(api: apiClient);
     final invoiceRepo = InvoiceRepository(
       api: apiClient,
     ); // Not caching invoices yet
@@ -76,6 +79,7 @@ class SVPMSApp extends StatelessWidget {
         RepositoryProvider<PORepository>.value(value: poRepo),
         RepositoryProvider<InvoiceRepository>.value(value: invoiceRepo),
         RepositoryProvider<RFQRepository>.value(value: rfqRepo),
+        RepositoryProvider<ContractRepository>.value(value: contractRepo),
         RepositoryProvider<LocalCacheService>.value(value: localCache),
       ],
       child: MultiBlocProvider(
@@ -90,6 +94,7 @@ class SVPMSApp extends StatelessWidget {
             create: (_) => InvoiceBloc(repo: invoiceRepo)..add(LoadInvoices()),
           ),
           BlocProvider(create: (_) => RFQBloc(repo: rfqRepo)..add(LoadRFQs())),
+          BlocProvider(create: (_) => ContractBloc(repo: contractRepo)..add(LoadContracts())),
         ],
         child: MaterialApp.router(
           title: 'SVPMS Vendor Portal',

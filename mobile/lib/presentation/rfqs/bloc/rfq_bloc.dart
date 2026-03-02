@@ -17,6 +17,8 @@ class LoadRFQs extends RFQEvent {
   List<Object?> get props => [status];
 }
 
+class LoadMoreRFQs extends RFQEvent {}
+
 class RefreshRFQs extends RFQEvent {}
 
 class LoadRFQDetail extends RFQEvent {
@@ -54,9 +56,12 @@ class RFQLoading extends RFQState {}
 class RFQListLoaded extends RFQState {
   final List<RFQ> rfqs;
   final String? activeStatus;
-  RFQListLoaded(this.rfqs, {this.activeStatus});
+  final bool hasMore;
+  final int page;
+  final bool isLoadingMore;
+  RFQListLoaded(this.rfqs, {this.activeStatus, this.hasMore = true, this.page = 1, this.isLoadingMore = false});
   @override
-  List<Object?> get props => [rfqs, activeStatus];
+  List<Object?> get props => [rfqs, activeStatus, hasMore, page, isLoadingMore];
 }
 
 class RFQDetailLoaded extends RFQState {
@@ -78,28 +83,46 @@ class RFQError extends RFQState {
 // ─── Bloc ────────────────────────────────────────────────
 class RFQBloc extends Bloc<RFQEvent, RFQState> {
   final RFQRepository _repo;
+  String? _lastStatus;
 
   RFQBloc({required RFQRepository repo}) : _repo = repo, super(RFQInitial()) {
     on<LoadRFQs>(_onLoad);
+    on<LoadMoreRFQs>(_onLoadMore);
     on<RefreshRFQs>(_onRefresh);
     on<LoadRFQDetail>(_onLoadDetail);
     on<SubmitBid>(_onSubmitBid);
   }
 
   Future<void> _onLoad(LoadRFQs event, Emitter<RFQState> emit) async {
+    _lastStatus = event.status;
     emit(RFQLoading());
     try {
-      final rfqs = await _repo.list(status: event.status);
-      emit(RFQListLoaded(rfqs, activeStatus: event.status));
+      final rfqs = await _repo.list(status: event.status, page: 1);
+      emit(RFQListLoaded(rfqs, activeStatus: event.status, hasMore: rfqs.length >= 20, page: 1));
     } catch (e) {
       emit(RFQError(e.toString()));
     }
   }
 
+  Future<void> _onLoadMore(LoadMoreRFQs event, Emitter<RFQState> emit) async {
+    final current = state;
+    if (current is! RFQListLoaded || !current.hasMore || current.isLoadingMore) return;
+
+    emit(RFQListLoaded(current.rfqs, activeStatus: current.activeStatus, hasMore: current.hasMore, page: current.page, isLoadingMore: true));
+    try {
+      final nextPage = current.page + 1;
+      final more = await _repo.list(status: _lastStatus, page: nextPage);
+      final combined = [...current.rfqs, ...more];
+      emit(RFQListLoaded(combined, activeStatus: current.activeStatus, hasMore: more.length >= 20, page: nextPage));
+    } catch (e) {
+      emit(RFQListLoaded(current.rfqs, activeStatus: current.activeStatus, hasMore: current.hasMore, page: current.page));
+    }
+  }
+
   Future<void> _onRefresh(RefreshRFQs event, Emitter<RFQState> emit) async {
     try {
-      final rfqs = await _repo.list();
-      emit(RFQListLoaded(rfqs));
+      final rfqs = await _repo.list(page: 1);
+      emit(RFQListLoaded(rfqs, hasMore: rfqs.length >= 20, page: 1));
     } catch (e) {
       emit(RFQError(e.toString()));
     }

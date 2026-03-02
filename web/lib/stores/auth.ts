@@ -41,6 +41,13 @@ export const useAuthStore = create<AuthState>()(
                     headers: { Authorization: `Bearer ${data.access_token}` },
                 });
 
+                // Admin portal rejects vendor-only accounts
+                if (profile.role === "vendor") {
+                    localStorage.removeItem("access_token");
+                    localStorage.removeItem("refresh_token");
+                    throw new Error("Access denied. Vendors must use the Vendor Portal.");
+                }
+
                 set({
                     user: profile,
                     accessToken: data.access_token,

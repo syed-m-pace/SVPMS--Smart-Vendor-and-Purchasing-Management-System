@@ -156,15 +156,24 @@ export interface RFQBid {
 
 export interface Contract {
     id: string;
-    tenant_id: string;
+    tenant_id?: string;
     contract_number: string;
     vendor_id: string;
+    vendor_name?: string;
+    po_id?: string;
     title: string;
+    description?: string;
     status: "DRAFT" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+    value_cents?: number;
+    total_value_cents?: number;
+    currency: string;
     start_date: string;
     end_date: string;
-    total_value_cents: number;
-    currency: string;
+    auto_renew?: boolean;
+    renewal_notice_days?: number;
+    sla_terms?: string;
+    document_key?: string;
+    terminated_at?: string;
     created_at: string;
 }
 

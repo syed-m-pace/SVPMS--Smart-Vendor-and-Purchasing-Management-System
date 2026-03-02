@@ -332,6 +332,34 @@ class ApiClient {
     );
   }
 
+  // ─── Contracts ────────────────────────────────────────
+  Future<Map<String, dynamic>> getContracts({
+    String? status,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final resp = await dio.get(
+      '/api/v1/contracts',
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+        if (status != null) 'status': status,
+      },
+    );
+    return resp.data;
+  }
+
+  Future<Map<String, dynamic>> getContract(String id) async {
+    final resp = await dio.get('/api/v1/contracts/$id');
+    return resp.data;
+  }
+
+  // ─── Vendor Scorecard ───────────────────────────────────
+  Future<Map<String, dynamic>> getVendorScorecard(String vendorId) async {
+    final resp = await dio.get('/api/v1/vendors/$vendorId/scorecard');
+    return resp.data;
+  }
+
   // ─── FCM ──────────────────────────────────────────────
   Future<void> updateFCMToken(String token, String deviceType) async {
     await dio.post(

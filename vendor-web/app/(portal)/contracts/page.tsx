@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/DataTable";
@@ -13,6 +14,7 @@ import type { Contract } from "@/types/models";
 const STATUS_FILTERS = ["ALL", "ACTIVE", "DRAFT", "EXPIRED", "TERMINATED"];
 
 export default function ContractsPage() {
+    const router = useRouter();
     const [data, setData] = useState<Contract[]>([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -90,6 +92,7 @@ export default function ContractsPage() {
                 page={page}
                 totalPages={totalPages}
                 onPageChange={setPage}
+                onRowClick={(row) => router.push(`/contracts/${row.id}`)}
                 emptyMessage="No contracts found."
             />
         </div>
