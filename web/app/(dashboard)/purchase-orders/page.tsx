@@ -185,7 +185,7 @@ export default function PurchaseOrdersPage() {
         { header: "PO Number", cell: (po: PurchaseOrder) => <span className="font-mono font-medium">{po.po_number}</span> },
         { header: "Vendor", cell: (po: PurchaseOrder) => <span>{po.vendor_name || "—"}</span> },
         { header: "Amount", cell: (po: PurchaseOrder) => <span className="font-mono">{formatCurrency(po.total_cents)}</span> },
-        { header: "Expected Delivery", cell: (po: PurchaseOrder) => <span className="font-medium text-blue-600">{po.expected_delivery_date ? formatDate(po.expected_delivery_date) : "Not specified"}</span> },
+        { header: "Expected Delivery", cell: (po: PurchaseOrder) => <span className="font-medium text-foreground">{po.expected_delivery_date ? formatDate(po.expected_delivery_date) : "Not specified"}</span> },
         { header: "Updated", cell: (po: PurchaseOrder) => <span className="text-muted-foreground">{po.updated_at ? timeAgo(po.updated_at) : "—"}</span> },
     ];
 

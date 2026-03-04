@@ -71,10 +71,10 @@ function StatusBanner({ status }: { status: string }) {
             );
         case "PAID":
             return (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-[hsl(175,70%,40%)]/10 border border-[hsl(175,70%,40%)]/20">
-                    <Banknote className="h-5 w-5 text-[hsl(175,70%,40%)]" />
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-gray-700/10 border border-gray-700/20">
+                    <Banknote className="h-5 w-5 text-gray-700" />
                     <div>
-                        <p className="text-sm font-medium text-[hsl(175,70%,40%)]">Payment Complete</p>
+                        <p className="text-sm font-medium text-gray-700">Payment Complete</p>
                         <p className="text-xs text-muted-foreground">This invoice has been paid.</p>
                     </div>
                 </div>

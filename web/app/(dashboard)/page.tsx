@@ -55,7 +55,7 @@ interface AnalyticsData {
     }>;
 }
 
-const CHART_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+const CHART_COLORS = ["#1a1a1a", "#404040", "#595959", "#737373", "#999999", "#b3b3b3"];
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -126,27 +126,27 @@ export default function DashboardPage() {
             value: stats?.pending_prs ?? 0,
             icon: FileText,
             href: "/purchase-requests?status=PENDING",
-            gradient: "from-sky-500/15 to-sky-500/5",
-            iconBg: "bg-sky-500/15",
-            iconColor: "text-sky-500",
+            gradient: "from-gray-500/15 to-gray-500/5",
+            iconBg: "bg-gray-900/10",
+            iconColor: "text-gray-700",
         },
         {
             title: "Active POs",
             value: stats?.active_pos ?? 0,
             icon: ShoppingCart,
             href: "/purchase-orders",
-            gradient: "from-emerald-500/15 to-emerald-500/5",
-            iconBg: "bg-emerald-500/15",
-            iconColor: "text-emerald-500",
+            gradient: "from-gray-400/15 to-gray-400/5",
+            iconBg: "bg-gray-700/10",
+            iconColor: "text-gray-600",
         },
         {
             title: "Invoice Exceptions",
             value: stats?.invoice_exceptions ?? 0,
             icon: AlertTriangle,
             href: "/exceptions",
-            gradient: "from-red-500/15 to-red-500/5",
-            iconBg: "bg-red-500/15",
-            iconColor: "text-red-500",
+            gradient: "from-gray-500/15 to-gray-500/5",
+            iconBg: "bg-gray-800/10",
+            iconColor: "text-gray-700",
             alert: (stats?.invoice_exceptions ?? 0) > 0,
         },
         {
@@ -154,27 +154,27 @@ export default function DashboardPage() {
             value: `${stats?.budget_utilization ?? 0}%`,
             icon: TrendingUp,
             href: "/budgets",
-            gradient: "from-violet-500/15 to-violet-500/5",
-            iconBg: "bg-violet-500/15",
-            iconColor: "text-violet-500",
+            gradient: "from-gray-300/15 to-gray-300/5",
+            iconBg: "bg-gray-600/10",
+            iconColor: "text-gray-500",
         },
         {
             title: "Total Vendors",
             value: stats?.total_vendors ?? 0,
             icon: Users,
             href: "/vendors",
-            gradient: "from-orange-500/15 to-orange-500/5",
-            iconBg: "bg-orange-500/15",
-            iconColor: "text-orange-500",
+            gradient: "from-gray-400/15 to-gray-400/5",
+            iconBg: "bg-gray-500/10",
+            iconColor: "text-gray-500",
         },
         {
             title: "Total Invoices",
             value: stats?.total_invoices ?? 0,
             icon: Receipt,
             href: "/invoices",
-            gradient: "from-cyan-500/15 to-cyan-500/5",
-            iconBg: "bg-cyan-500/15",
-            iconColor: "text-cyan-500",
+            gradient: "from-gray-300/15 to-gray-300/5",
+            iconBg: "bg-gray-400/10",
+            iconColor: "text-gray-400",
         },
     ];
 
@@ -250,28 +250,28 @@ export default function DashboardPage() {
 
             {/* ──── Financial Summary Row ──── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="border-l-4 border-l-blue-500">
+                <Card className="border-l-4 border-l-gray-900">
                     <CardContent className="p-5">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Budget</p>
                                 <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(totalBudget)}</p>
                             </div>
-                            <div className="rounded-xl bg-blue-500/10 p-3">
-                                <DollarSign className="h-6 w-6 text-blue-500" />
+                            <div className="rounded-xl bg-gray-900/10 p-3">
+                                <DollarSign className="h-6 w-6 text-gray-700" />
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="border-l-4 border-l-emerald-500">
+                <Card className="border-l-4 border-l-gray-600">
                     <CardContent className="p-5">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Spent</p>
                                 <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(totalSpent)}</p>
                             </div>
-                            <div className="rounded-xl bg-emerald-500/10 p-3">
-                                <ArrowUp className="h-6 w-6 text-emerald-500" />
+                            <div className="rounded-xl bg-gray-600/10 p-3">
+                                <ArrowUp className="h-6 w-6 text-gray-500" />
                             </div>
                         </div>
                         {totalBudget > 0 && (
@@ -282,7 +282,7 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700"
+                                        className="h-full bg-gray-700 rounded-full transition-all duration-700"
                                         style={{ width: `${Math.min((totalSpent / totalBudget) * 100, 100)}%` }}
                                     />
                                 </div>
@@ -290,15 +290,15 @@ export default function DashboardPage() {
                         )}
                     </CardContent>
                 </Card>
-                <Card className="border-l-4 border-l-violet-500">
+                <Card className="border-l-4 border-l-gray-400">
                     <CardContent className="p-5">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total PO Value</p>
                                 <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(totalPOValue)}</p>
                             </div>
-                            <div className="rounded-xl bg-violet-500/10 p-3">
-                                <Package className="h-6 w-6 text-violet-500" />
+                            <div className="rounded-xl bg-gray-400/10 p-3">
+                                <Package className="h-6 w-6 text-gray-400" />
                             </div>
                         </div>
                     </CardContent>
@@ -445,8 +445,8 @@ export default function DashboardPage() {
                                             return null;
                                         }}
                                     />
-                                    <Bar dataKey="amount" name="Amount" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                                    <Bar dataKey="count" name="Count" fill="#8b5cf6" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                                    <Bar dataKey="amount" name="Amount" fill="#1a1a1a" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                                    <Bar dataKey="count" name="Count" fill="#999999" radius={[6, 6, 0, 0]} maxBarSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
@@ -478,8 +478,8 @@ export default function DashboardPage() {
                                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                                     <Tooltip content={<CustomTooltipContent />} />
                                     <Legend wrapperStyle={{ fontSize: "12px" }} />
-                                    <Bar dataKey="budget" name="Budget" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                                    <Bar dataKey="spent" name="Spent" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                    <Bar dataKey="budget" name="Budget" fill="#b3b3b3" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                    <Bar dataKey="spent" name="Spent" fill="#1a1a1a" radius={[4, 4, 0, 0]} maxBarSize={30} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
@@ -510,14 +510,14 @@ export default function DashboardPage() {
                                     const total = Object.values(stats!.invoice_status_breakdown).reduce((a, b) => a + b, 0);
                                     const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                                     const statusColor: Record<string, string> = {
-                                        UPLOADED: "#f59e0b",
-                                        PROCESSING: "#eab308",
-                                        MATCHED: "#3b82f6",
-                                        EXCEPTION: "#ef4444",
-                                        DISPUTED: "#f97316",
-                                        APPROVED: "#22c55e",
-                                        APPROVED_FOR_PAYMENT: "#16a34a",
-                                        PAID: "#10b981",
+                                        UPLOADED: "#999999",
+                                        PROCESSING: "#b3b3b3",
+                                        MATCHED: "#404040",
+                                        EXCEPTION: "#737373",
+                                        DISPUTED: "#595959",
+                                        APPROVED: "#1a1a1a",
+                                        APPROVED_FOR_PAYMENT: "#2d2d2d",
+                                        PAID: "#404040",
                                     };
                                     return (
                                         <div key={status} className="group">

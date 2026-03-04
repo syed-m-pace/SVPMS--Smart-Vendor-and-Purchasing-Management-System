@@ -70,7 +70,7 @@ export default function ContractsPage() {
                     },
                     {
                         header: "Value",
-                        cell: (row) => formatCurrency(row.total_value_cents, row.currency),
+                        cell: (row) => formatCurrency(row.total_value_cents ?? 0, row.currency),
                         sortable: true,
                         accessorKey: "total_value_cents",
                     },

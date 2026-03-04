@@ -24,23 +24,23 @@ import { vendorService } from "@/lib/api/vendors";
 import type { Vendor } from "@/types/models";
 
 // ── Palette ────────────────────────────────────────────────────────────────
-const PIE_COLORS = ["#4F46E5", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#F97316"];
+const PIE_COLORS = ["#1a1a1a", "#404040", "#595959", "#737373", "#999999", "#b3b3b3", "#d4d4d4"];
 
 const STATUS_COLOR: Record<string, string> = {
-    DRAFT: "#94A3B8",
-    PENDING: "#F59E0B",
-    APPROVED: "#22C55E",
-    REJECTED: "#EF4444",
-    CANCELLED: "#6B7280",
-    UPLOADED: "#F59E0B",
-    MATCHED: "#22C55E",
-    EXCEPTION: "#EF4444",
-    DISPUTED: "#F97316",
-    PAID: "#8B5CF6",
-    ACTIVE: "#22C55E",
-    BLOCKED: "#EF4444",
-    ARCHIVED: "#6B7280",
-    PENDING_REVIEW: "#F59E0B",
+    DRAFT: "#b3b3b3",
+    PENDING: "#999999",
+    APPROVED: "#404040",
+    REJECTED: "#737373",
+    CANCELLED: "#d4d4d4",
+    UPLOADED: "#999999",
+    MATCHED: "#404040",
+    EXCEPTION: "#737373",
+    DISPUTED: "#595959",
+    PAID: "#1a1a1a",
+    ACTIVE: "#404040",
+    BLOCKED: "#737373",
+    ARCHIVED: "#d4d4d4",
+    PENDING_REVIEW: "#999999",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -198,11 +198,11 @@ export default function AnalyticsPage() {
     ].filter((d) => d.value > 0);
 
     const matchColors: Record<string, string> = {
-        Matched: "#22C55E",
-        Exception: "#EF4444",
-        Disputed: "#F97316",
-        Uploaded: "#F59E0B",
-        Paid: "#8B5CF6",
+        Matched: "#404040",
+        Exception: "#737373",
+        Disputed: "#595959",
+        Uploaded: "#999999",
+        Paid: "#1a1a1a",
     };
 
     // ── Loading ──────────────────────────────────────────────────────────────
@@ -245,8 +245,8 @@ export default function AnalyticsPage() {
                     label="Active Vendors"
                     value={String(activeVendors)}
                     sub={`of ${vendors.length} total vendors onboarded`}
-                    icon={<Users className="h-5 w-5 text-blue-500" />}
-                    iconBg="bg-blue-500/10"
+                    icon={<Users className="h-5 w-5 text-gray-600" />}
+                    iconBg="bg-gray-600/10"
                 />
                 <KpiCard
                     label="Budget Utilized"
@@ -282,7 +282,7 @@ export default function AnalyticsPage() {
                         {deptSpend.length > 0 ? (
                             <ResponsiveContainer width="100%" height={280}>
                                 <BarChart data={deptSpend} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                                     <XAxis dataKey="dept" tick={{ fontSize: 11 }} />
                                     <YAxis
                                         tick={{ fontSize: 11 }}
@@ -294,8 +294,8 @@ export default function AnalyticsPage() {
                                     />
                                     <Tooltip content={<CurrencyTooltip />} />
                                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                                    <Bar dataKey="Spent" fill="#4F46E5" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Budget" fill="#E2E8F0" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="Spent" fill="#1a1a1a" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="Budget" fill="#d4d4d4" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -364,7 +364,7 @@ export default function AnalyticsPage() {
                                 layout="vertical"
                                 margin={{ top: 4, right: 24, left: 16, bottom: 0 }}
                             >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" horizontal={false} />
                                 <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                                 <YAxis
                                     type="category"
@@ -400,7 +400,7 @@ export default function AnalyticsPage() {
                                 >
                                     <CartesianGrid
                                         strokeDasharray="3 3"
-                                        stroke="#f0f0f0"
+                                        stroke="#e5e5e5"
                                         horizontal={false}
                                     />
                                     <XAxis
@@ -419,7 +419,7 @@ export default function AnalyticsPage() {
                                         width={130}
                                     />
                                     <Tooltip content={<CurrencyTooltip />} />
-                                    <Bar dataKey="PO Value" fill="#06B6D4" radius={[0, 4, 4, 0]} />
+                                    <Bar dataKey="PO Value" fill="#404040" radius={[0, 4, 4, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -488,7 +488,7 @@ export default function AnalyticsPage() {
                                 data={monthlyData}
                                 margin={{ top: 4, right: 24, left: 0, bottom: 0 }}
                             >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                                 <YAxis
                                     tick={{ fontSize: 11 }}
@@ -502,9 +502,9 @@ export default function AnalyticsPage() {
                                 <Line
                                     type="monotone"
                                     dataKey="Invoice Spend"
-                                    stroke="#4F46E5"
+                                    stroke="#1a1a1a"
                                     strokeWidth={2.5}
-                                    dot={{ fill: "#4F46E5", strokeWidth: 0, r: 4 }}
+                                    dot={{ fill: "#1a1a1a", strokeWidth: 0, r: 4 }}
                                     activeDot={{ r: 6, strokeWidth: 0 }}
                                 />
                             </LineChart>

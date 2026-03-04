@@ -33,7 +33,7 @@ export default function RFQDetailPage() {
         const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const label = days > 0 ? `${days}d ${hours}h remaining` : `${hours}h remaining`;
-        const color = days >= 7 ? "text-green-600" : days >= 3 ? "text-yellow-600" : "text-destructive";
+        const color = days >= 7 ? "text-muted-foreground" : days >= 3 ? "text-foreground" : "text-destructive";
         return { label, color };
     }, [rfq?.deadline]);
 
