@@ -59,6 +59,7 @@ class DashboardScreen extends StatelessWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     StatCard(
+                      key: const Key('dashboard_stat_active_pos'),
                       title: 'Active POs',
                       value: state.stats.activePOs.toString(),
                       icon: Icons.shopping_cart,
@@ -66,6 +67,7 @@ class DashboardScreen extends StatelessWidget {
                       onTap: () => context.go('/purchase-orders'),
                     ),
                     StatCard(
+                      key: const Key('dashboard_stat_pending_rfqs'),
                       title: 'Pending RFQs',
                       value: state.stats.pendingRFQs.toString(),
                       icon: Icons.attach_money,
@@ -73,6 +75,7 @@ class DashboardScreen extends StatelessWidget {
                       onTap: () => context.go('/rfqs'),
                     ),
                     StatCard(
+                      key: const Key('dashboard_stat_open_invoices'),
                       title: 'Open Invoices',
                       value: state.stats.openInvoices.toString(),
                       icon: Icons.receipt_long,
@@ -85,6 +88,7 @@ class DashboardScreen extends StatelessWidget {
 
                 // ── Recent POs ──
                 Text(
+                  key: const Key('dashboard_recent_pos_header'),
                   'Recent Purchase Orders',
                   style: TextStyle(
                     fontSize: 18,

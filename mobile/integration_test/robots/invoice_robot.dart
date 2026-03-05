@@ -6,22 +6,26 @@ class InvoiceRobot {
 
   InvoiceRobot(this.tester);
 
-  // Finders
+  // Key-based finders
+  Finder invoiceItem(String invoiceId) => find.byKey(Key('invoice_item_$invoiceId'));
   final createInvoiceButton = find.byKey(const Key('create_invoice_fab'));
   final poDropdown = find.byKey(const Key('invoice_po_dropdown'));
   final invoiceNumberField = find.byKey(const Key('invoice_number_input'));
   final amountField = find.byKey(const Key('invoice_amount_input'));
-  final uploadButton = find.byKey(const Key('invoice_upload_file_button'));
   final submitButton = find.byKey(const Key('invoice_submit_button'));
+
+  Future<void> verifyInvoiceListLoaded() async {
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+    // At least one invoice item should be visible
+    expect(find.byKey(const Key('invoice_item_inv-001')), findsOneWidget);
+  }
 
   Future<void> tapCreateInvoice() async {
     await tester.tap(createInvoiceButton);
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(seconds: 5));
   }
 
   Future<void> selectPO(String? poNumber) async {
-    // Handling dropdowns in integration tests can be tricky;
-    // assuming first available is sufficient for flow test or specific widget key
     await tester.tap(poDropdown);
     await tester.pumpAndSettle();
     await tester.tap(find.text(poNumber ?? '').first);
@@ -36,6 +40,6 @@ class InvoiceRobot {
 
   Future<void> submit() async {
     await tester.tap(submitButton);
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(seconds: 5));
   }
 }

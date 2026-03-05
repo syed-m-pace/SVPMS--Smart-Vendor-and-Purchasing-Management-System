@@ -135,6 +135,7 @@ class _POListScreenState extends State<POListScreen> {
                             }
                             final po = filtered[index];
                             return Card(
+                              key: Key('po_item_${po.id}'),
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
                                 onTap: () =>

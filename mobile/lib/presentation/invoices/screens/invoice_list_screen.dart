@@ -134,6 +134,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                             }
                             final inv = filtered[i];
                             return Card(
+                              key: Key('invoice_item_${inv.id}'),
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
                                 title: Text(
