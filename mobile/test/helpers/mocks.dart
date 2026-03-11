@@ -1,4 +1,7 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:svpms_vendor/data/datasources/api/api_client.dart';
 import 'package:svpms_vendor/data/repositories/auth_repository.dart';
 import 'package:svpms_vendor/data/repositories/dashboard_repository.dart';
 import 'package:svpms_vendor/data/repositories/po_repository.dart';
@@ -23,3 +26,9 @@ class MockContractRepository extends Mock implements ContractRepository {}
 class MockLocalCacheService extends Mock implements LocalCacheService {}
 
 class MockStorageService extends Mock implements StorageService {}
+
+class MockApiClient extends Mock implements ApiClient {}
+
+class MockDio extends Mock implements Dio {}
+
+class MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}

@@ -137,5 +137,68 @@ void main() {
         isA<RFQError>(),
       ],
     );
+
+    blocTest<RFQBloc, RFQState>(
+      'RefreshRFQs emits RFQListLoaded',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenAnswer((_) async => [makeRFQ()]);
+        return RFQBloc(repo: mockRepo);
+      },
+      seed: () => RFQListLoaded([makeRFQ()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshRFQs()),
+      expect: () => [isA<RFQListLoaded>()],
+    );
+
+    blocTest<RFQBloc, RFQState>(
+      'RefreshRFQs emits RFQError on failure',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenThrow(Exception('Timeout'));
+        return RFQBloc(repo: mockRepo);
+      },
+      seed: () => RFQListLoaded([makeRFQ()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshRFQs()),
+      expect: () => [isA<RFQError>()],
+    );
+
+    blocTest<RFQBloc, RFQState>(
+      'LoadMoreRFQs does nothing when hasMore is false',
+      build: () => RFQBloc(repo: mockRepo),
+      seed: () => RFQListLoaded([makeRFQ()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(LoadMoreRFQs()),
+      expect: () => [],
+    );
+
+    blocTest<RFQBloc, RFQState>(
+      'LoadMoreRFQs recovers on error',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 2))
+            .thenThrow(Exception('Network error'));
+        return RFQBloc(repo: mockRepo);
+      },
+      seed: () => RFQListLoaded([makeRFQ()], hasMore: true, page: 1),
+      act: (bloc) => bloc.add(LoadMoreRFQs()),
+      expect: () => [
+        isA<RFQListLoaded>().having((s) => s.isLoadingMore, 'loading', true),
+        isA<RFQListLoaded>()
+            .having((s) => s.rfqs.length, 'count', 1)
+            .having((s) => s.page, 'page', 1),
+      ],
+    );
+
+    blocTest<RFQBloc, RFQState>(
+      'LoadRFQDetail emits RFQError on failure',
+      build: () {
+        when(() => mockRepo.getById(any()))
+            .thenThrow(Exception('Not found'));
+        return RFQBloc(repo: mockRepo);
+      },
+      act: (bloc) => bloc.add(LoadRFQDetail('rfq-999')),
+      expect: () => [
+        isA<RFQLoading>(),
+        isA<RFQError>(),
+      ],
+    );
   });
 }

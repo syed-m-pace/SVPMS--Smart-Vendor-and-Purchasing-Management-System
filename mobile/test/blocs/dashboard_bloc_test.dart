@@ -63,5 +63,18 @@ void main() {
             .having((s) => s.stats.activePOs, 'activePOs', 10),
       ],
     );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'emits [DashboardError] when refresh fails',
+      build: () {
+        when(() => mockRepo.getStats())
+            .thenThrow(Exception('Timeout'));
+        when(() => mockRepo.getRecentPOs())
+            .thenAnswer((_) async => []);
+        return DashboardBloc(repo: mockRepo);
+      },
+      act: (bloc) => bloc.add(RefreshDashboard()),
+      expect: () => [isA<DashboardError>()],
+    );
   });
 }

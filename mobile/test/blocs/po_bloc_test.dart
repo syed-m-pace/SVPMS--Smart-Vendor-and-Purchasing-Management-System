@@ -149,5 +149,76 @@ void main() {
         isA<POError>(),
       ],
     );
+
+    blocTest<POBloc, POState>(
+      'RefreshPOs emits POListLoaded',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenAnswer((_) async => [makePurchaseOrder()]);
+        return POBloc(repo: mockRepo);
+      },
+      seed: () => POListLoaded([makePurchaseOrder()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshPOs()),
+      expect: () => [isA<POListLoaded>()],
+    );
+
+    blocTest<POBloc, POState>(
+      'RefreshPOs emits POError on failure',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenThrow(Exception('Timeout'));
+        return POBloc(repo: mockRepo);
+      },
+      seed: () => POListLoaded([makePurchaseOrder()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshPOs()),
+      expect: () => [isA<POError>()],
+    );
+
+    blocTest<POBloc, POState>(
+      'LoadMorePOs recovers on error',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 2))
+            .thenThrow(Exception('Network error'));
+        return POBloc(repo: mockRepo);
+      },
+      seed: () => POListLoaded([makePurchaseOrder()], hasMore: true, page: 1),
+      act: (bloc) => bloc.add(LoadMorePOs()),
+      expect: () => [
+        isA<POListLoaded>().having((s) => s.isLoadingMore, 'loading', true),
+        isA<POListLoaded>()
+            .having((s) => s.orders.length, 'count', 1)
+            .having((s) => s.page, 'page', 1),
+      ],
+    );
+
+    blocTest<POBloc, POState>(
+      'AcknowledgePO from POAcknowledged state',
+      build: () {
+        final ackPO = makePurchaseOrder(status: 'ACKNOWLEDGED');
+        when(() => mockRepo.acknowledge(any(), any()))
+            .thenAnswer((_) async => ackPO);
+        return POBloc(repo: mockRepo);
+      },
+      seed: () => POAcknowledged(makePurchaseOrder()),
+      act: (bloc) => bloc.add(AcknowledgePO('po-001', '2026-04-01')),
+      expect: () => [
+        isA<POAcknowledging>(),
+        isA<POAcknowledged>(),
+      ],
+    );
+
+    blocTest<POBloc, POState>(
+      'LoadPODetail emits POError on failure',
+      build: () {
+        when(() => mockRepo.getById(any()))
+            .thenThrow(Exception('Not found'));
+        return POBloc(repo: mockRepo);
+      },
+      act: (bloc) => bloc.add(LoadPODetail('po-999')),
+      expect: () => [
+        isA<POLoading>(),
+        isA<POError>(),
+      ],
+    );
   });
 }

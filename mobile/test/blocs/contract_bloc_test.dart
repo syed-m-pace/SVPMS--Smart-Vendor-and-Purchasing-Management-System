@@ -93,5 +93,68 @@ void main() {
             .having((s) => s.page, 'page', 2),
       ],
     );
+
+    blocTest<ContractBloc, ContractState>(
+      'LoadMoreContracts does nothing when hasMore is false',
+      build: () => ContractBloc(repo: mockRepo),
+      seed: () => ContractListLoaded([makeContract()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(LoadMoreContracts()),
+      expect: () => [],
+    );
+
+    blocTest<ContractBloc, ContractState>(
+      'LoadMoreContracts recovers on error',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 2))
+            .thenThrow(Exception('Network error'));
+        return ContractBloc(repo: mockRepo);
+      },
+      seed: () => ContractListLoaded([makeContract()], hasMore: true, page: 1),
+      act: (bloc) => bloc.add(LoadMoreContracts()),
+      expect: () => [
+        isA<ContractListLoaded>().having((s) => s.isLoadingMore, 'loading', true),
+        isA<ContractListLoaded>()
+            .having((s) => s.contracts.length, 'count', 1)
+            .having((s) => s.page, 'page', 1),
+      ],
+    );
+
+    blocTest<ContractBloc, ContractState>(
+      'RefreshContracts emits ContractListLoaded',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenAnswer((_) async => [makeContract()]);
+        return ContractBloc(repo: mockRepo);
+      },
+      seed: () => ContractListLoaded([makeContract()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshContracts()),
+      expect: () => [isA<ContractListLoaded>()],
+    );
+
+    blocTest<ContractBloc, ContractState>(
+      'RefreshContracts emits ContractError on failure',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenThrow(Exception('Timeout'));
+        return ContractBloc(repo: mockRepo);
+      },
+      seed: () => ContractListLoaded([makeContract()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshContracts()),
+      expect: () => [isA<ContractError>()],
+    );
+
+    blocTest<ContractBloc, ContractState>(
+      'LoadContractDetail emits ContractError on failure',
+      build: () {
+        when(() => mockRepo.getById(any()))
+            .thenThrow(Exception('Not found'));
+        return ContractBloc(repo: mockRepo);
+      },
+      act: (bloc) => bloc.add(LoadContractDetail('c-999')),
+      expect: () => [
+        isA<ContractLoading>(),
+        isA<ContractError>(),
+      ],
+    );
   });
 }

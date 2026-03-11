@@ -165,5 +165,82 @@ void main() {
         isA<InvoiceError>(),
       ],
     );
+
+    blocTest<InvoiceBloc, InvoiceState>(
+      'RefreshInvoices emits InvoiceListLoaded',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenAnswer((_) async => [makeInvoice()]);
+        return InvoiceBloc(repo: mockRepo);
+      },
+      seed: () => InvoiceListLoaded([makeInvoice()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshInvoices()),
+      expect: () => [isA<InvoiceListLoaded>()],
+    );
+
+    blocTest<InvoiceBloc, InvoiceState>(
+      'RefreshInvoices emits InvoiceError on failure',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 1))
+            .thenThrow(Exception('Timeout'));
+        return InvoiceBloc(repo: mockRepo);
+      },
+      seed: () => InvoiceListLoaded([makeInvoice()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(RefreshInvoices()),
+      expect: () => [isA<InvoiceError>()],
+    );
+
+    blocTest<InvoiceBloc, InvoiceState>(
+      'LoadMoreInvoices does nothing when hasMore is false',
+      build: () => InvoiceBloc(repo: mockRepo),
+      seed: () => InvoiceListLoaded([makeInvoice()], hasMore: false, page: 1),
+      act: (bloc) => bloc.add(LoadMoreInvoices()),
+      expect: () => [],
+    );
+
+    blocTest<InvoiceBloc, InvoiceState>(
+      'LoadMoreInvoices recovers on error',
+      build: () {
+        when(() => mockRepo.list(status: any(named: 'status'), page: 2))
+            .thenThrow(Exception('Network error'));
+        return InvoiceBloc(repo: mockRepo);
+      },
+      seed: () => InvoiceListLoaded([makeInvoice()], hasMore: true, page: 1),
+      act: (bloc) => bloc.add(LoadMoreInvoices()),
+      expect: () => [
+        isA<InvoiceListLoaded>().having((s) => s.isLoadingMore, 'loading', true),
+        isA<InvoiceListLoaded>()
+            .having((s) => s.invoices.length, 'count', 1)
+            .having((s) => s.page, 'page', 1),
+      ],
+    );
+
+    blocTest<InvoiceBloc, InvoiceState>(
+      'DisputeInvoice emits InvoiceError on failure',
+      build: () {
+        when(() => mockRepo.disputeInvoice(any(), reason: any(named: 'reason')))
+            .thenThrow(Exception('Server error'));
+        return InvoiceBloc(repo: mockRepo);
+      },
+      act: (bloc) => bloc.add(DisputeInvoice(invoiceId: 'inv-001', reason: 'Bad')),
+      expect: () => [
+        isA<InvoiceLoading>(),
+        isA<InvoiceError>(),
+      ],
+    );
+
+    blocTest<InvoiceBloc, InvoiceState>(
+      'ReuploadInvoice emits InvoiceError on failure',
+      build: () {
+        when(() => mockRepo.reuploadInvoice(any(), any()))
+            .thenThrow(Exception('Upload failed'));
+        return InvoiceBloc(repo: mockRepo);
+      },
+      act: (bloc) => bloc.add(ReuploadInvoice(invoiceId: 'inv-001', filePath: '/tmp/f.pdf')),
+      expect: () => [
+        isA<InvoiceLoading>(),
+        isA<InvoiceError>(),
+      ],
+    );
   });
 }
